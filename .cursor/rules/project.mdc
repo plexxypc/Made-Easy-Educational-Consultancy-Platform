@@ -1,0 +1,73 @@
+# Project Rules — Made Easy Educational Consultancy Platform
+
+## What this project is
+A platform for Made Easy Educational Consultancy: a public marketing site, a paid
+service catalogue (WAEC/NECO/GCE/NABTEB registration, result checkers, admission
+guidance, document processing), Paystack payments, a customer dashboard, a Filament
+admin panel, a blog/updates section, a consultation booking system, and a school/course
+search tool. Full scope is in the attached requirements document.
+
+## Tech stack — do not substitute without asking
+- **Framework:** Laravel 13, PHP 8.3+
+- **Admin panel:** Filament 5 (Panel Builder, Forms, Tables, Notifications)
+- **Frontend:** Blade + Livewire 3 + Tailwind CSS. No separate JS framework/SPA.
+- **Database:** PostgreSQL 16
+- **Queue/cache:** Database driver (no Redis at launch)
+- **Payments:** Paystack, via server-initiated transactions + verified webhooks
+- **File storage:** Private local disk (`storage/app/private`), never `public`
+- **Web server:** Caddy (automatic HTTPS) in front of PHP-FPM
+- **Containerization:** Docker Compose — app, db, queue worker, caddy
+- **Auth:** Laravel's built-in auth (Breeze scaffolding is fine), not a third-party
+  auth SaaS
+
+## Non-negotiable security rules
+These apply because the platform stores payment data and sensitive personal
+documents (NIN slips, birth certificates, WAEC/NECO details).
+
+1. **Every uploaded document is private.** Never store uploads under `public/` or any
+   publicly-resolvable path. Serve them only through a controller that checks the
+   requesting user owns the document or has an admin/staff role.
+2. **Never trust client-side payment confirmation.** An order is only marked "paid"
+   after the Paystack webhook is received, its signature verified, and the amount
+   matches the order total. The browser redirect after checkout is a UX nicety only.
+3. **Webhooks must be idempotent.** Paystack can send the same webhook more than
+   once. Use the Paystack reference as a unique key so re-processing a webhook never
+   double-fulfils an order or double-issues a result checker PIN.
+4. **Role-gate everything server-side.** Three roles: `customer`, `staff`, `admin`.
+   Every controller/Livewire action and every Filament resource must check the role,
+   not just hide the button in the UI.
+5. **Audit sensitive access.** Log (user id, timestamp, document id) whenever a
+   staff/admin user opens a customer's uploaded document. Show this log in Filament.
+6. **Validate all file uploads:** enforce file type, max size, and re-check the MIME
+   type server-side (not just the extension).
+7. **Secrets never hardcoded.** Paystack keys, DB credentials, mail credentials all
+   come from `.env`, and `.env` is gitignored.
+
+## Coding conventions
+- Follow Laravel's own conventions (PSR-12, `php artisan` generators, standard
+  folder structure). Don't invent a custom architecture.
+- Business logic goes in Action classes or Service classes, not in controllers or
+  Filament resource classes — keeps both the public site and admin panel able to
+  reuse the same logic.
+- Every model that stores money uses integer kobo/naira consistently (state which
+  one in the migration comment) — never floats for currency.
+- Every migration must be reversible (`down()` implemented).
+- Write a short docblock on any non-obvious business rule (e.g. PIN stock
+  fallback, application status transitions).
+- Use Laravel's form request classes for validation, not inline validation in
+  controllers.
+
+## What to do when a requirement is ambiguous
+State the assumption you're making in a code comment and proceed with the most
+common-sense interpretation. Don't stop and ask mid-generation — flag it in the
+PR/response summary instead so it can be corrected in review.
+
+## Environments
+- Local dev: `docker compose up` should be enough to run the full stack.
+- Production: same Docker Compose setup, deployed to the Hostinger KVM 2 VPS
+  (Lithuania region), fronted by Caddy for automatic HTTPS.
+
+## Out of scope for now
+- Redis, S3-compatible storage, SMS gateways, WhatsApp Business API — don't add
+  these unless a later prompt explicitly asks for them.
+- Mathematics tutorials are WhatsApp-only (a contact link), not an in-app feature.

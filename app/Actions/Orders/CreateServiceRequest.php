@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Actions\Orders;
+
+use App\Actions\Documents\StoreOrderDocument;
+use App\Enums\OrderStatus;
+use App\Exceptions\BusinessRuleException;
+use App\Mail\ServiceRequestReceivedMail;
+use App\Models\Order;
+use App\Models\OrderDocument;
+use App\Models\Service;
+use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
+
+/**
+ * Create an order from the public "Request this service" form.
+ *
+ * Business rules:
+ *  - The order starts in pending_payment. Nothing here takes or implies payment.
+ *  - total_amount is copied from the service price (0 for quote services,
+ *    which then await an admin "Set Total").
+ *  - Contact details always go in guest_*; user_id is set only when a signed-in
+ *    customer submits (staff/admin testing the site don't become owners).
+ *  - Uploaded files become order_documents via StoreOrderDocument. If anything
+ *    fails, the order is rolled back and files already written are deleted.
+ */
+class CreateServiceRequest
+{
+    /**
+     * @param  StoreOrderDocument  $store_order_document
+     */
+    public function __construct(
+        private readonly StoreOrderDocument $store_order_document,
+    ) {}
+
+    /**
+     * @param  Service  $service
+     * @param  array{name: string, email: string, phone: string}  $contact
+     * @param  array<string, mixed>  $answers  Non-file answers keyed by field key.
+     * @param  array<string, UploadedFile>  $files  Uploaded files keyed by field key.
+     * @param  User|null  $submitted_by  Signed-in user, if any.
+     * @return Order
+     *
+     * @throws BusinessRuleException
+     */
+    public function handle(Service $service, array $contact, array $answers, array $files = [], ?User $submitted_by = null): Order
+    {
+        if (! $service->acceptsRequests()) {
+            throw new BusinessRuleException('This service is not currently available to request.');
+        }
+
+        $stored_paths = [];
+
+        try {
+            $order = DB::transaction(function () use ($service, $contact, $answers, $files, $submitted_by, &$stored_paths): Order {
+                $order = new Order([
+                    'service_id' => $service->id,
+                    'guest_name' => $contact['name'],
+                    'guest_email' => $contact['email'],
+                    'guest_phone' => $contact['phone'],
+                ]);
+
+                $order->forceFill([
+                    'user_id' => $submitted_by?->isCustomer() ? $submitted_by->id : null,
+                    'status' => OrderStatus::PendingPayment,
+                    'total_amount' => $service->price,
+                ])->save();
+
+                foreach ($files as $field_key => $file) {
+                    $document = $this->store_order_document->handle($order, $file, $field_key);
+                    $stored_paths[] = $document->stored_path;
+                    $answers[$field_key] = $document->original_filename;
+                }
+
+                $order->field_answers = $answers;
+                $order->save();
+
+                return $order;
+            });
+        } catch (Throwable $exception) {
+            Storage::disk(OrderDocument::DISK)->delete($stored_paths);
+
+            throw $exception;
+        }
+
+        Mail::to($order->guest_email)->queue(new ServiceRequestReceivedMail($order));
+
+        return $order;
+    }
+}
