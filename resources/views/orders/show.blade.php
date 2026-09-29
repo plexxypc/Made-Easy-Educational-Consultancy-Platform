@@ -1,6 +1,6 @@
 @php($input_classes = 'block w-full rounded-xl border-slate-300 text-base shadow-sm focus:border-brand-500 focus:ring-brand-500')
 
-<x-public-layout :title="'Request #'.$order->id">
+<x-public-layout :title="'Request '.$order->display_reference">
     <section class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         @if ($can_download)
             <a href="{{ route('my-requests') }}" class="text-sm text-slate-500 hover:underline">&larr; My Requests</a>
@@ -8,7 +8,7 @@
 
         <div class="mt-2 flex flex-wrap items-start justify-between gap-3">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Reference #{{ $order->id }}</p>
+                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Reference {{ $order->display_reference }}</p>
                 <h1 class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">{{ $order->service->name }}</h1>
                 <p class="mt-1 text-sm text-slate-500">Submitted {{ $order->created_at->format('j M Y, g:ia') }}</p>
             </div>
@@ -22,6 +22,37 @@
         <p class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-lg text-slate-800 shadow-sm">
             {{ $order->status->customerDescription() }}
         </p>
+
+        @error('payment')
+            <div class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800" role="alert">{{ $message }}</div>
+        @enderror
+
+        @if ($receipt)
+            <section class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5" aria-labelledby="payment-heading">
+                <h2 id="payment-heading" class="text-lg font-bold text-emerald-900">Paid: {{ $receipt->amount_label }}</h2>
+                <p class="mt-1 text-slate-700">Receipt {{ $receipt->number }} · {{ $receipt->paid_at->format('j M Y, g:ia') }}</p>
+                <div class="mt-4 grid gap-3 sm:flex">
+                    <x-public.button :href="route('orders.receipt', $order)">View receipt</x-public.button>
+                    <x-public.button :href="route('orders.receipt', ['order' => $order, 'download' => 1])" variant="secondary">Download receipt</x-public.button>
+                </div>
+            </section>
+        @elseif ($order->canBePaid())
+            <section class="mt-6 rounded-2xl border-2 border-brand-200 bg-brand-50/60 p-5 sm:p-6" aria-labelledby="payment-heading">
+                <h2 id="payment-heading" class="text-xl font-bold text-slate-900">Amount to pay: {{ \App\Support\Money::format($order->total_amount) }}</h2>
+                <p class="mt-2 text-slate-700">Pay securely by card, bank transfer or USSD through Paystack. You'll come back here afterwards.</p>
+                <form method="POST" action="{{ route('orders.pay', $order) }}" class="mt-4">
+                    @csrf
+                    <button type="submit" class="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl bg-brand-700 px-8 text-base font-semibold text-white shadow-sm hover:bg-brand-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-300 sm:w-auto">
+                        Pay {{ \App\Support\Money::format($order->total_amount) }} now
+                    </button>
+                </form>
+            </section>
+        @elseif ($order->status === \App\Enums\OrderStatus::PendingPayment && $order->awaitsQuote())
+            <section class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5" aria-labelledby="payment-heading">
+                <h2 id="payment-heading" class="text-lg font-bold text-amber-900">Price not set yet</h2>
+                <p class="mt-1 text-slate-800">{{ $order->paymentBlocker() }}</p>
+            </section>
+        @endif
 
         @if ($order->status === \App\Enums\OrderStatus::NeedsAction)
             <section class="mt-8 rounded-2xl border-2 border-red-200 bg-red-50/60 p-5 sm:p-6" aria-labelledby="needs-action-heading">
@@ -114,7 +145,7 @@
                             'border-slate-200 bg-white' => ! $status_change->by_customer,
                         ])>
                             <p class="text-sm text-slate-500">
-                                <span class="font-semibold text-slate-700">{{ $status_change->by_customer ? 'You' : 'Made Easy team' }}</span>
+                                <span class="font-semibold text-slate-700">{{ $status_change->by_customer ? 'You' : ($status_change->to_status === \App\Enums\OrderStatus::Paid && $status_change->changed_by === null ? 'Payment' : 'Made Easy team') }}</span>
                                 · {{ $status_change->created_at->format('j M Y, g:ia') }}
                                 · {{ $status_change->to_status->getLabel() }}
                             </p>
@@ -126,7 +157,7 @@
         @endif
 
         <p class="mt-10 text-sm text-slate-600">
-            Questions? <a href="{{ route('contact') }}" class="font-semibold text-brand-700 underline">Contact us</a> and quote reference #{{ $order->id }}.
+            Questions? <a href="{{ route('contact') }}" class="font-semibold text-brand-700 underline">Contact us</a> and quote reference {{ $order->display_reference }}.
         </p>
     </section>
 </x-public-layout>

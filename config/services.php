@@ -29,8 +29,9 @@ return [
     ],
 
     /*
-     * Paystack credentials only; no payment logic yet. The secret key is also
-     * what webhook signatures (x-paystack-signature, HMAC-SHA512) are verified with.
+     * Paystack credentials, used by App\Services\Paystack\PaystackClient. The
+     * secret key is also what webhook signatures (x-paystack-signature,
+     * HMAC-SHA512) are verified with.
      */
     'paystack' => [
         'public_key' => env('PAYSTACK_PUBLIC_KEY'),

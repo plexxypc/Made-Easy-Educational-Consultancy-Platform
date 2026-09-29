@@ -66,7 +66,7 @@ class CustomerRespondedToOrder extends Notification implements ShouldQueue
     public function toDatabase(User $notifiable): array
     {
         return FilamentNotification::make()
-            ->title("Customer responded to order #{$this->order->id}")
+            ->title("Customer responded to order {$this->order->display_reference}")
             ->body($this->summary())
             ->icon('heroicon-o-chat-bubble-left-ellipsis')
             ->info()
@@ -86,7 +86,7 @@ class CustomerRespondedToOrder extends Notification implements ShouldQueue
     public function toMail(User $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject("Customer responded to order #{$this->order->id}")
+            ->subject("Customer responded to order {$this->order->display_reference}")
             ->line($this->summary())
             ->action('Open order', $this->order_url);
     }

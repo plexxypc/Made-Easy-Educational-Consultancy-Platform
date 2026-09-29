@@ -75,14 +75,14 @@ class OrderResource extends Resource
     }
 
     /**
-     * Title shown on the view page, e.g. "Order #42".
+     * Title shown on the view page, e.g. "Order ME-7K3Q9A" (or "Order #42" for old orders).
      *
      * @param  Model|null  $record
      * @return string
      */
     public static function getRecordTitle(?Model $record): string
     {
-        return $record ? "Order #{$record->getKey()}" : 'Order';
+        return $record instanceof Order ? "Order {$record->display_reference}" : 'Order';
     }
 
     /**

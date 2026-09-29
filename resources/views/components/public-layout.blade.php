@@ -1,6 +1,7 @@
 @props([
     'title' => null,
     'description' => null,
+    'refresh_url' => null,
 ])
 {{-- Public site layout. CSS only: no JavaScript is needed to read or use any page. --}}
 <!DOCTYPE html>
@@ -12,6 +13,11 @@
 
         <title>{{ $title ? $title.' | ' : '' }}{{ config('madeeasy.contact.business_name') }}</title>
         <meta name="description" content="{{ $description ?? 'Reliable educational and documentation services: WAEC and NECO registration, admission guidance, result checking, certificate processing and JAMB services.' }}">
+
+        @if ($refresh_url)
+            {{-- Re-checks without JavaScript (e.g. waiting for a payment to be confirmed). --}}
+            <meta http-equiv="refresh" content="5;url={{ $refresh_url }}">
+        @endif
 
         @vite(['resources/css/app.css'])
     </head>

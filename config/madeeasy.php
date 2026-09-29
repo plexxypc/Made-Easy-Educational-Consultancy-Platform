@@ -52,6 +52,20 @@ return [
     'order_lookups' => [
         'per_minute_per_ip' => 5,
         'per_hour_per_reference' => 10,
+        // A guest who looked an order up must do so again after this long without using the page.
+        'guest_idle_minutes' => (int) env('GUEST_TRACKING_IDLE_MINUTES', 30),
+    ],
+
+    /*
+     * Paystack. Credentials live in config/services.php (PAYSTACK_*).
+     * Staff are always notified in the back office when a payment needs a
+     * human (wrong amount, order not payable); this also emails them.
+     */
+    'payments' => [
+        'currency' => 'NGN',
+        'email_staff_on_review' => (bool) env('EMAIL_STAFF_ON_PAYMENT_REVIEW', true),
+        // The Paystack return page re-checks this many times (every 5 seconds) while waiting for the webhook.
+        'return_page_max_checks' => 12,
     ],
 
     /*

@@ -3,17 +3,17 @@ Hello {{ $customer_name }},
 
 Your request has been received.
 
-**Reference: #{{ $reference }}**<br>
+**Reference: {{ $reference }}**<br>
 **Service:** {{ $service_name }}<br>
 **Price:** {{ $price_label }}
 
 @if ($is_quote)
 This service is priced per request. We'll review your details and tell you the price before you pay anything.
 @else
-No payment has been taken. We'll contact you with the next steps, including how to pay.
+No payment has been taken yet. You can pay securely online from your request page.
 @endif
 
-Please quote your reference (#{{ $reference }}) whenever you contact us.
+Please quote your reference ({{ $reference }}) whenever you contact us.
 
 <x-mail::button :url="$track_url">
 Track your request

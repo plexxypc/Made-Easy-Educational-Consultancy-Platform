@@ -58,9 +58,11 @@ class ChangeOrderStatus
             $locked_order = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
 
             if (! $locked_order->canTransitionTo($next_status)) {
-                $reason = $locked_order->awaitsQuote()
-                    ? 'Set the total for this quote order first.'
-                    : "An order that is \"{$locked_order->status->getLabel()}\" can't be marked \"{$next_status->getLabel()}\".";
+                $reason = match (true) {
+                    $locked_order->awaitsQuote() => 'Set the total for this quote order first.',
+                    $locked_order->status->canTransitionTo($next_status) && $locked_order->awaitingPayment() => "This order hasn't been paid yet. It can move on once the customer's payment is confirmed.",
+                    default => "An order that is \"{$locked_order->status->getLabel()}\" can't be marked \"{$next_status->getLabel()}\".",
+                };
 
                 throw new BusinessRuleException($reason);
             }

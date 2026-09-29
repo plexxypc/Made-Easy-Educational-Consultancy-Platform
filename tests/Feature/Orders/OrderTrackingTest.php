@@ -63,7 +63,7 @@ class OrderTrackingTest extends TestCase
     public function test_guest_can_look_up_own_order_by_email(): void
     {
         $response = $this->post(route('orders.track.lookup'), [
-            'reference' => "#{$this->order->id}",
+            'reference' => ' #'.strtolower(str_replace('-', '', $this->order->reference)),
             'contact' => '  ada.obi@example.COM ',
         ]);
 
@@ -71,7 +71,7 @@ class OrderTrackingTest extends TestCase
 
         $this->followRedirects($response)
             ->assertOk()
-            ->assertSee("Reference #{$this->order->id}")
+            ->assertSee("Reference {$this->order->reference}")
             ->assertSee('Birth Certificate')
             ->assertSee('Pending payment')
             ->assertSee(OrderStatus::PendingPayment->customerDescription())
@@ -107,7 +107,7 @@ class OrderTrackingTest extends TestCase
         foreach (['08031234567', '+234 803 123 4567', '234-803-123-4567', '(0803) 123 4567'] as $phone) {
             $this->flushSession();
 
-            $this->post(route('orders.track.lookup'), ['reference' => (string) $this->order->id, 'contact' => $phone])
+            $this->post(route('orders.track.lookup'), ['reference' => $this->order->reference, 'contact' => $phone])
                 ->assertRedirect(route('orders.track.show', $this->order));
         }
 
@@ -124,12 +124,13 @@ class OrderTrackingTest extends TestCase
         $other_order = Order::factory()->guest()->create(['guest_email' => 'someone@example.com']);
 
         $attempts = [
-            ['reference' => (string) $this->order->id, 'contact' => 'someone@example.com'],
-            ['reference' => (string) $this->order->id, 'contact' => '08099999999'],
-            ['reference' => (string) $other_order->id, 'contact' => 'ada.obi@example.com'],
-            ['reference' => '999999', 'contact' => 'ada.obi@example.com'],
+            ['reference' => $this->order->reference, 'contact' => 'someone@example.com'],
+            ['reference' => $this->order->reference, 'contact' => '08099999999'],
+            ['reference' => $other_order->reference, 'contact' => 'ada.obi@example.com'],
+            ['reference' => 'ME-ZZZZZZ', 'contact' => 'ada.obi@example.com'],
+            ['reference' => (string) $this->order->id, 'contact' => 'ada.obi@example.com'],
             ['reference' => 'abc', 'contact' => 'ada.obi@example.com'],
-            ['reference' => (string) $this->order->id, 'contact' => '0803'],
+            ['reference' => $this->order->reference, 'contact' => '0803'],
         ];
 
         foreach ($attempts as $index => $attempt) {
@@ -152,7 +153,7 @@ class OrderTrackingTest extends TestCase
     {
         $this->order->delete();
 
-        $this->post(route('orders.track.lookup'), ['reference' => (string) $this->order->id, 'contact' => 'ada.obi@example.com'])
+        $this->post(route('orders.track.lookup'), ['reference' => $this->order->reference, 'contact' => 'ada.obi@example.com'])
             ->assertSessionHasErrors('reference');
     }
 
@@ -178,6 +179,47 @@ class OrderTrackingTest extends TestCase
     }
 
     /**
+     * Guest access ends after 30 idle minutes; activity keeps it alive.
+     *
+     * @return void
+     */
+    public function test_guest_access_expires_after_idle_timeout(): void
+    {
+        $this->look_up('ada.obi@example.com');
+
+        $this->travel(25)->minutes();
+        $this->get(route('orders.track.show', $this->order))->assertOk();
+
+        // 25 + 25 = 50 minutes since the lookup, but only 25 since the last visit.
+        $this->travel(25)->minutes();
+        $this->get(route('orders.track.show', $this->order))->assertOk();
+
+        $this->travel(31)->minutes();
+        $this->get(route('orders.track.show', $this->order))
+            ->assertRedirect(route('orders.track'))
+            ->assertSessionHas('status');
+
+        // Expired for responding too.
+        $this->post(route('orders.respond', $this->order), ['note' => 'Hello'])
+            ->assertRedirect(route('orders.track'));
+    }
+
+    /**
+     * Owners aren't affected by the guest idle timeout.
+     *
+     * @return void
+     */
+    public function test_owner_access_does_not_expire(): void
+    {
+        $customer = User::factory()->create();
+        $order = Order::factory()->for($customer)->create();
+
+        $this->travel(3)->hours();
+
+        $this->actingAs($customer)->get(route('orders.track.show', $order))->assertOk();
+    }
+
+    /**
      * Looking up one order doesn't open another.
      *
      * @return void
@@ -200,12 +242,12 @@ class OrderTrackingTest extends TestCase
     public function test_lookups_are_rate_limited_per_ip(): void
     {
         for ($attempt = 1; $attempt <= 5; $attempt++) {
-            $this->post(route('orders.track.lookup'), ['reference' => (string) (1000 + $attempt), 'contact' => 'guess@example.com'])
+            $this->post(route('orders.track.lookup'), ['reference' => 'ME-00000'.$attempt, 'contact' => 'guess@example.com'])
                 ->assertSessionHasErrors('reference');
         }
 
         $this->from(route('orders.track'))
-            ->post(route('orders.track.lookup'), ['reference' => (string) $this->order->id, 'contact' => 'ada.obi@example.com'])
+            ->post(route('orders.track.lookup'), ['reference' => $this->order->reference, 'contact' => 'ada.obi@example.com'])
             ->assertRedirect(route('orders.track'))
             ->assertSessionHasErrors(['reference' => 'Too many attempts. Please wait a few minutes and try again.']);
 
@@ -221,12 +263,12 @@ class OrderTrackingTest extends TestCase
     {
         for ($attempt = 1; $attempt <= 10; $attempt++) {
             $this->withServerVariables(['REMOTE_ADDR' => "10.0.0.{$attempt}"])
-                ->post(route('orders.track.lookup'), ['reference' => (string) $this->order->id, 'contact' => "guess{$attempt}@example.com"])
+                ->post(route('orders.track.lookup'), ['reference' => $this->order->reference, 'contact' => "guess{$attempt}@example.com"])
                 ->assertSessionHasErrors('reference');
         }
 
         $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.99'])
-            ->post(route('orders.track.lookup'), ['reference' => (string) $this->order->id, 'contact' => 'ada.obi@example.com'])
+            ->post(route('orders.track.lookup'), ['reference' => $this->order->reference, 'contact' => 'ada.obi@example.com'])
             ->assertSessionHasErrors(['reference' => 'Too many attempts. Please wait a few minutes and try again.']);
     }
 
@@ -256,7 +298,7 @@ class OrderTrackingTest extends TestCase
     public function test_staff_notes_are_shown(): void
     {
         $staff_user = User::factory()->staff()->create(['name' => 'Private Staff Name']);
-        app(ChangeOrderStatus::class)->handle($this->order, OrderStatus::InProgress, $staff_user, 'Started on your certificate.');
+        app(ChangeOrderStatus::class)->handle($this->order, OrderStatus::NeedsAction, $staff_user, 'Started on your certificate.');
 
         $this->look_up('ada.obi@example.com');
 
@@ -326,7 +368,7 @@ class OrderTrackingTest extends TestCase
      */
     private function look_up(string $contact): void
     {
-        $this->post(route('orders.track.lookup'), ['reference' => (string) $this->order->id, 'contact' => $contact])
+        $this->post(route('orders.track.lookup'), ['reference' => $this->order->reference, 'contact' => $contact])
             ->assertRedirect(route('orders.track.show', $this->order));
     }
 }

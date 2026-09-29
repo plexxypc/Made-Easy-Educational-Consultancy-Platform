@@ -10,7 +10,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * One order status transition. Append-only; written by ChangeOrderStatus
- * (staff) and RespondToNeedsAction (customer).
+ * (staff), RespondToNeedsAction (customer) and ConfirmPaystackCharge (verified payment).
  *
  * @property int $id
  * @property int $order_id
@@ -44,17 +44,18 @@ class OrderStatusChange extends Model
     }
 
     /**
-     * Who made the change, for display: "Customer", the staff name, or "Made Easy team".
+     * Who made the change, for display: "Customer", "Paystack (verified payment)",
+     * the staff name, or "Made Easy team".
      *
      * @return string
      */
     public function actorLabel(): string
     {
-        if ($this->by_customer) {
-            return 'Customer';
-        }
-
-        return $this->changedBy?->name ?? 'Made Easy team';
+        return match (true) {
+            $this->by_customer => 'Customer',
+            $this->changed_by === null && $this->to_status === OrderStatus::Paid => 'Paystack (verified payment)',
+            default => $this->changedBy?->name ?? 'Made Easy team',
+        };
     }
 
     /**

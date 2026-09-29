@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderDocumentController;
+use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\OrderTrackingController;
+use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ServiceCatalogueController;
 use App\Http\Controllers\ServiceRequestController;
 use App\Livewire\Hello;
@@ -27,14 +29,27 @@ Route::get('requests/{order}/received', [ServiceRequestController::class, 'recei
     ->name('service-requests.received');
 
 // "Track your request": reference + email/phone lookup, then the order page.
+// Order URLs use the reference, not the id, so a URL never reveals more than the customer already has.
 Route::get('track', [OrderTrackingController::class, 'lookup_form'])->name('orders.track');
 Route::post('track', [OrderTrackingController::class, 'lookup'])
     ->middleware('throttle:order-lookups')
     ->name('orders.track.lookup');
-Route::get('track/{order}', [OrderTrackingController::class, 'show'])->name('orders.track.show');
-Route::post('track/{order}/respond', [OrderTrackingController::class, 'respond'])
+Route::get('track/{order:reference}', [OrderTrackingController::class, 'show'])->name('orders.track.show');
+Route::post('track/{order:reference}/respond', [OrderTrackingController::class, 'respond'])
     ->middleware('throttle:order-responses')
     ->name('orders.respond');
+
+// Payments (Paystack). Only the verified webhook marks an order paid.
+Route::post('track/{order:reference}/pay', [OrderPaymentController::class, 'pay'])
+    ->middleware('throttle:order-payments')
+    ->name('orders.pay');
+Route::get('track/{order:reference}/payment/return', [OrderPaymentController::class, 'payment_return'])
+    ->middleware('throttle:order-payments')
+    ->name('orders.payment.return');
+Route::get('track/{order:reference}/receipt', [OrderPaymentController::class, 'receipt'])->name('orders.receipt');
+
+// Server-to-server from Paystack; CSRF-exempt (bootstrap/app.php), authenticated by signature.
+Route::post('webhooks/paystack', PaystackWebhookController::class)->name('webhooks.paystack');
 
 // Placeholders: the result checker store and updates/blog are built in later prompts.
 Route::view('result-checker', 'pages.result-checker')->name('result-checker');

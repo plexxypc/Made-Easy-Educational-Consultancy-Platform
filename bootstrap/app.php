@@ -31,6 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
         ]);
+
+        // Paystack can't send a CSRF token; the webhook checks its HMAC signature instead.
+        $middleware->preventRequestForgery(except: ['webhooks/paystack']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

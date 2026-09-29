@@ -1,7 +1,7 @@
 <x-mail::message>
 Hello {{ $customer_name }},
 
-The status of your order **#{{ $order_number }}** ({{ $service_name }}) is now **{{ $status_label }}**.
+The status of your order **{{ $order_number }}** ({{ $service_name }}) is now **{{ $status_label }}**.
 
 @if ($note)
 **Message from our team:**

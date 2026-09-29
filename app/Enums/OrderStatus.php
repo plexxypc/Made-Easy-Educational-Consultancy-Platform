@@ -20,11 +20,11 @@ use Filament\Support\Contracts\HasLabel;
  * had before (Order::statusBeforeNeedsAction(), RespondToNeedsAction).
  *
  * "paid" is never set by staff: only a verified Paystack webhook whose amount
- * matches orders.total_amount may do that (project security rule 2, payments prompt).
- * Until payments exist, staff manage orders manually, which is why
- * pending_payment -> in_progress is allowed for now.
+ * matches orders.total_amount may do that (ConfirmPaystackCharge, security rule 2).
  *
- * Quote-type orders have an extra guard in Order::canTransitionTo().
+ * pending_payment -> in_progress is listed here for ₦0 orders only: Order::canTransitionTo()
+ * refuses in_progress/completed while the order still owes money, and refuses
+ * everything but cancel for a quote order with no total yet.
  */
 enum OrderStatus: string implements HasColor, HasLabel
 {

@@ -6,6 +6,7 @@ use App\Actions\Documents\StoreOrderDocument;
 use App\Enums\OrderStatus;
 use App\Enums\UserRole;
 use App\Exceptions\BusinessRuleException;
+use App\Mail\NeedsActionResponseReceivedMail;
 use App\Models\Order;
 use App\Models\OrderDocument;
 use App\Models\OrderStatusChange;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Notifications\CustomerRespondedToOrder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -27,7 +29,8 @@ use Throwable;
  *    request form); the note and the transition are recorded as a customer
  *    OrderStatusChange (by_customer = true).
  *  - The order returns to the status it had before (Order::statusBeforeNeedsAction()).
- *  - All staff and admins get a notification (Filament bell, optional email).
+ *  - All staff and admins get a notification (Filament bell, optional email),
+ *    and the customer gets a queued confirmation email.
  *
  * Caller must have checked access (TrackedOrders::allows()).
  */
@@ -95,6 +98,14 @@ class RespondToNeedsAction
             User::query()->whereIn('role', [UserRole::Staff->value, UserRole::Admin->value])->get(),
             new CustomerRespondedToOrder($order, $status_change, count($files)),
         );
+
+        if ($order->customer_email !== null) {
+            Mail::to($order->customer_email)->queue(new NeedsActionResponseReceivedMail(
+                $order,
+                $status_change,
+                array_map(fn (UploadedFile $file): string => $file->getClientOriginalName(), $files),
+            ));
+        }
 
         return $status_change;
     }

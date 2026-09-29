@@ -4,6 +4,7 @@ namespace Tests\Feature\Orders;
 
 use App\Actions\Orders\ChangeOrderStatus;
 use App\Enums\OrderStatus;
+use App\Mail\NeedsActionResponseReceivedMail;
 use App\Mail\OrderStatusChangedMail;
 use App\Models\Order;
 use App\Models\OrderDocument;
@@ -102,6 +103,15 @@ class RespondToNeedsActionTest extends TestCase
         Notification::assertSentTo([$this->staff_user, $admin_user], CustomerRespondedToOrder::class, fn (CustomerRespondedToOrder $notification): bool => $notification->order->is($order));
         Notification::assertNotSentTo($customer, CustomerRespondedToOrder::class);
         Mail::assertNotQueued(OrderStatusChangedMail::class);
+        Mail::assertQueued(NeedsActionResponseReceivedMail::class, function (NeedsActionResponseReceivedMail $mail) use ($order): bool {
+            $mail->assertSeeInText("We've received your response for");
+            $mail->assertSeeInHtml($order->reference);
+            $mail->assertSeeInHtml('Here is a clearer scan.');
+            $mail->assertSeeInHtml('clear NIN.pdf');
+
+            return $mail->hasTo('ada@example.com');
+        });
+        Mail::assertQueuedCount(1);
 
         $this->get(route('orders.track.show', $order))
             ->assertOk()
@@ -118,7 +128,7 @@ class RespondToNeedsActionTest extends TestCase
     public function test_owner_response_restores_in_progress(): void
     {
         $customer = User::factory()->create();
-        $order = Order::factory()->for($customer)->create();
+        $order = Order::factory()->for($customer)->withStatus(OrderStatus::Paid)->create();
         app(ChangeOrderStatus::class)->handle($order, OrderStatus::InProgress, $this->staff_user);
         app(ChangeOrderStatus::class)->handle($order->refresh(), OrderStatus::NeedsAction, $this->staff_user, 'Which year did you sit the exam?');
 
@@ -152,7 +162,7 @@ class RespondToNeedsActionTest extends TestCase
         $notification = $this->staff_user->notifications()->sole();
         $this->assertSame(CustomerRespondedToOrder::class, $notification->type);
         $this->assertSame('filament', $notification->data['format']);
-        $this->assertSame("Customer responded to order #{$order->id}", $notification->data['title']);
+        $this->assertSame("Customer responded to order {$order->reference}", $notification->data['title']);
         $this->assertStringContainsString('1 document uploaded', $notification->data['body']);
         $this->assertStringContainsString("/admin/orders/{$order->id}", json_encode($notification->data['actions'], JSON_UNESCAPED_SLASHES));
     }
@@ -297,7 +307,7 @@ class RespondToNeedsActionTest extends TestCase
      */
     private function look_up(Order $order): void
     {
-        $this->post(route('orders.track.lookup'), ['reference' => (string) $order->id, 'contact' => 'ada@example.com'])
+        $this->post(route('orders.track.lookup'), ['reference' => $order->reference, 'contact' => 'ada@example.com'])
             ->assertRedirect(route('orders.track.show', $order));
     }
 

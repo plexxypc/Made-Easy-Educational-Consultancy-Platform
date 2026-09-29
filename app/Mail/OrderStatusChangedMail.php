@@ -39,7 +39,7 @@ class OrderStatusChangedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "Order #{$this->order->id}: {$this->status_change->to_status->getLabel()}",
+            subject: "Order {$this->order->display_reference}: {$this->status_change->to_status->getLabel()}",
         );
     }
 
@@ -54,7 +54,7 @@ class OrderStatusChangedMail extends Mailable implements ShouldQueue
             markdown: 'mail.orders.status-changed',
             with: [
                 'customer_name' => $this->order->customer_name,
-                'order_number' => $this->order->id,
+                'order_number' => $this->order->display_reference,
                 'service_name' => $this->order->service->name,
                 'status_label' => $this->status_change->to_status->getLabel(),
                 'note' => $this->status_change->note,

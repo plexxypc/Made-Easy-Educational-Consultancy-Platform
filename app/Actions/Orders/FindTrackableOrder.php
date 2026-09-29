@@ -8,8 +8,8 @@ use App\Support\PhoneNumber;
 /**
  * Find an order from the public "Track your request" form.
  *
- * Business rule: the reference (order number) alone is not enough, since
- * references are sequential. The visitor must also give the email or phone the
+ * Business rule: the reference alone is not enough (it appears in emails and
+ * old orders have sequential numbers). The visitor must also give the email or phone the
  * order was placed with. Email matches guest_email or the account email
  * (case-insensitive); phone matches guest_phone after normalising. A wrong
  * reference and a wrong contact give the same result (null), so the form
@@ -18,20 +18,20 @@ use App\Support\PhoneNumber;
 class FindTrackableOrder
 {
     /**
-     * @param  string  $reference  Order number, with or without a leading "#".
+     * @param  string  $reference  As typed, e.g. "ME-7K3Q9A", "me7k3q9a" or an old "#12" (Order::normaliseReference()).
      * @param  string  $contact  Email address or phone number.
      * @return ?Order
      */
     public function handle(string $reference, string $contact): ?Order
     {
-        $order_number = ltrim(trim($reference), '#');
+        $reference = Order::normaliseReference($reference);
         $contact = trim($contact);
 
-        if (! ctype_digit($order_number) || $contact === '') {
+        if ($reference === '' || $contact === '') {
             return null;
         }
 
-        $order = Order::query()->with('user')->find((int) $order_number);
+        $order = Order::query()->with('user')->where('reference', $reference)->first();
 
         if ($order === null) {
             return null;

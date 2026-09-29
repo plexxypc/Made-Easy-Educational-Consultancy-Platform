@@ -27,9 +27,12 @@ class OrdersTable
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['user', 'service']))
             ->defaultSort('created_at', 'desc')
             ->columns([
-                TextColumn::make('id')
-                    ->label('#')
-                    ->sortable(),
+                TextColumn::make('reference')
+                    ->label('Reference')
+                    ->formatStateUsing(fn (Order $record): string => $record->display_reference)
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where('reference', Order::normaliseReference($search)))
+                    ->copyable()
+                    ->copyableState(fn (Order $record): string => $record->reference),
                 TextColumn::make('customer_name')
                     ->label('Customer')
                     ->description(fn (Order $record): ?string => $record->user_id === null ? 'Guest' : null)

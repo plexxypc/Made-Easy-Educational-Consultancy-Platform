@@ -72,8 +72,8 @@ class OrderTrackingController extends Controller
         if (! TrackedOrders::allows($request, $order)) {
             return redirect()
                 ->route('orders.track')
-                ->withInput(['reference' => (string) $order->id])
-                ->with('status', 'Enter the email or phone number you used to view this request.');
+                ->withInput(['reference' => $order->reference])
+                ->with('status', 'Enter the email or phone number you used to view this request. For your security, we ask again after '.config('madeeasy.order_lookups.guest_idle_minutes').' minutes without activity.');
         }
 
         $order->load(['service', 'documents' => fn ($query) => $query->orderBy('uploaded_at')->orderBy('id')]);
@@ -84,6 +84,7 @@ class OrderTrackingController extends Controller
             'timeline' => $order->statusChanges()->whereNotNull('note')->get(),
             'needs_action_note' => $order->status === OrderStatus::NeedsAction ? $order->needsActionNote() : null,
             'can_download' => TrackedOrders::is_owner($request, $order),
+            'receipt' => $order->receipt,
             'upload_rules' => config('madeeasy.uploads'),
             'max_documents' => RespondToOrderRequest::MAX_DOCUMENTS,
         ]);

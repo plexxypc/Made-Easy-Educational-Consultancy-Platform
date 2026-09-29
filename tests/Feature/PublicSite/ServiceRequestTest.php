@@ -131,7 +131,7 @@ class ServiceRequestTest extends TestCase
         $this->followRedirects($response)
             ->assertOk()
             ->assertSee('Your request has been received.')
-            ->assertSee("Reference <strong class=\"whitespace-nowrap\">#{$order->id}</strong>. We'll be in touch.", false)
+            ->assertSee("Reference <strong class=\"whitespace-nowrap\">{$order->reference}</strong>. We'll be in touch.", false)
             ->assertSee('No payment has been taken.')
             ->assertDontSee('ada@example.com');
     }

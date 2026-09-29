@@ -6,7 +6,7 @@
             </span>
 
             <h1 class="mt-5 text-2xl font-extrabold text-slate-900 sm:text-3xl">Your request has been received.</h1>
-            <p class="mt-4 text-lg text-slate-800">Reference <strong class="whitespace-nowrap">#{{ $order->id }}</strong>. We'll be in touch.</p>
+            <p class="mt-4 text-lg text-slate-800">Reference <strong class="whitespace-nowrap">{{ $order->display_reference }}</strong>. We'll be in touch.</p>
 
             <p class="mt-4 text-slate-600">
                 Service: <strong>{{ $order->service->name }}</strong><br>

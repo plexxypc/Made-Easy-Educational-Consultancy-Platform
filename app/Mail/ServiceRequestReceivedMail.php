@@ -35,7 +35,7 @@ class ServiceRequestReceivedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "We've received your request (Reference #{$this->order->id})",
+            subject: "We've received your request (Reference {$this->order->display_reference})",
         );
     }
 
@@ -50,7 +50,7 @@ class ServiceRequestReceivedMail extends Mailable implements ShouldQueue
             markdown: 'mail.orders.request-received',
             with: [
                 'customer_name' => $this->order->customer_name,
-                'reference' => $this->order->id,
+                'reference' => $this->order->display_reference,
                 'service_name' => $this->order->service->name,
                 'price_label' => $this->order->service->priceLabel(),
                 'is_quote' => $this->order->isQuote(),

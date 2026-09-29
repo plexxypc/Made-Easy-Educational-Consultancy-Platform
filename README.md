@@ -186,7 +186,10 @@ They use the `<x-public-layout>` component. The nav comes from
 | `/result-checker`, `/updates` | Placeholders until their later prompts |
 | `/about`, `/contact` | About (placeholder copy) and Contact |
 | `/track` | **Track your request**: reference plus the email or phone used |
-| `/track/{order}` | Order page: status, answers, documents, messages and the needs-action response form |
+| `/track/{reference}` | Order page: status, answers, documents, messages, **Pay now**, receipt and the needs-action response form |
+| `/track/{reference}/receipt` | Payment receipt (printable HTML; `?download=1` saves it as a file) |
+| `/track/{reference}/payment/return` | Where Paystack sends the customer back; display only |
+| `POST /webhooks/paystack` | Paystack webhook (signature-checked, CSRF-exempt) |
 | `/my-requests` | Signed-in customer's own orders (login required) |
 
 **Service requests.** The form is built from each service's `customer_fields`,
@@ -199,8 +202,10 @@ set in the admin under Services, then "Information required from the customer".
   They are stored on the private disk under `order-documents/{order_id}/`, and the
   MIME type is re-checked from the file contents. Allowed types are PDF, JPG and
   PNG, up to `UPLOAD_MAX_KILOBYTES` each.
-- A queued `ServiceRequestReceivedMail` gives the customer their reference, which
-  is the order number. Submissions are rate-limited to 5 per minute per IP.
+- A queued `ServiceRequestReceivedMail` gives the customer their reference, a
+  random code such as `ME-7K2QXD` (`Order::generateReference()`, Crockford
+  base32, unique). Orders created before this change keep their old numeric
+  reference (shown as `#12`). Submissions are rate-limited to 5 per minute per IP.
 - Instant services (result checkers) and inactive services can't be requested.
 
 **Order tracking.** `App\Actions\Orders\FindTrackableOrder` matches the
@@ -208,9 +213,12 @@ reference against the guest or account email (any case), or the phone number
 after normalising (spaces, dashes and `+234` are ignored). A wrong reference and
 a wrong contact give the same error.
 
-- A match is remembered in the session (`App\Support\TrackedOrders`), so it
-  lasts until the session expires. The signed-in owner skips the lookup
-  (`OrderPolicy::track`).
+- A match is remembered in the session (`App\Support\TrackedOrders`). It
+  expires after `GUEST_TRACKING_IDLE_MINUTES` (default 30) without activity on
+  that order. The signed-in owner skips the lookup (`OrderPolicy::track`) and
+  never times out.
+- References are matched case-insensitively, with or without the dash, `#` or
+  spaces, and O/I/L are read as 0/1/1.
 - Guests see document filenames only. The owner also gets download links
   through the existing `/documents/{id}` route.
 - Lookups are rate-limited to 5 per minute per IP and 10 per hour per reference
@@ -222,10 +230,38 @@ form for a message and/or up to 5 documents. `App\Actions\Orders\RespondToNeedsA
 - stores the files through `StoreOrderDocument` (the same private path as the request form);
 - records a customer status change (`order_status_changes.by_customer`);
 - returns the order to the status it had before "needs action";
-- notifies every staff and admin user through `CustomerRespondedToOrder`.
+- notifies every staff and admin user through `CustomerRespondedToOrder`;
+- emails the customer a confirmation (`NeedsActionResponseReceivedMail`).
 
 Staff see that notification in the back-office bell, which polls every 30 seconds.
 Set `EMAIL_STAFF_ON_CUSTOMER_RESPONSE=true` to also email them.
+
+**Payments (Paystack).** An order is payable only while it is `pending_payment`
+with a total above ₦0. A quote order becomes payable only after **Set Total**
+(`Order::paymentBlocker()` explains why an order can't be paid).
+
+- **Pay now** (order page and My Requests) runs `App\Actions\Payments\InitiatePayment`.
+  It creates a `payments` row (`initiated`, amount in kobo, reference `MEPAY-…`)
+  and redirects to Paystack checkout. Each click creates a new row.
+- **Only the webhook marks an order paid.** `PaystackWebhookController` checks
+  `x-paystack-signature` (HMAC-SHA512 of the raw body with `PAYSTACK_SECRET_KEY`)
+  and rejects anything else with a 401. `charge.success` goes to
+  `App\Actions\Payments\ConfirmPaystackCharge`, which locks the payment row, so a
+  repeat delivery does nothing.
+- The charge is applied only if the status, currency (NGN) and amount exactly
+  match and the order is still `pending_payment`. Then the payment becomes
+  `successful`, the order `paid`, and a `receipts` snapshot is created and
+  emailed (`PaymentReceiptMail`).
+- Anything else is **not applied**. The payment keeps a `review_reason`, the
+  event is logged at error level, and staff get a `PaymentNeedsReview`
+  notification (plus email when `EMAIL_STAFF_ON_PAYMENT_REVIEW=true`). The order
+  screen shows a red "Payment needs review" callout. Refunds or manual fixes are
+  done by a person in the Paystack dashboard.
+- The return page calls Paystack's verify API only to decide what to *show*
+  ("confirming…", with a 5-second refresh). It never changes an order.
+
+Set the webhook URL in the Paystack dashboard to `https://<domain>/webhooks/paystack`.
+To test locally, expose the site with a tunnel (e.g. ngrok) and use test keys.
 
 **Contact details** (Contact page, footer, emails) come from the `CONTACT_*`
 variables in `.env`. After changing them in production, run
@@ -249,9 +285,10 @@ navigation. Business rules live in `app/Actions`, and Filament only calls them.
 
 **Order status workflow** (`OrderStatus::allowedNextStatuses()`):
 
-- `pending_payment` → in progress, needs action, or cancelled.
-- `paid` → in progress, completed, needs action, or cancelled. Only the
-  Paystack webhook sets `paid` (in a later prompt).
+- `pending_payment` → needs action or cancelled; → in progress only when the
+  total is ₦0. Orders with a total must be paid first.
+- `paid` → in progress, completed, needs action, or cancelled. Only the verified
+  Paystack webhook sets `paid`.
 - `in_progress` → completed, needs action, or cancelled.
 - `needs_action` → in progress or cancelled. Needs action requires a note.
 - `completed` and `cancelled` are final.
