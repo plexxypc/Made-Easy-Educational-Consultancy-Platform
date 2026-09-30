@@ -20,9 +20,7 @@ class OpenOrderDocument
     /**
      * @param  LogDocumentAccess  $log_document_access
      */
-    public function __construct(private readonly LogDocumentAccess $log_document_access)
-    {
-    }
+    public function __construct(private readonly LogDocumentAccess $log_document_access) {}
 
     /**
      * Log the view (for staff/admin) and stream the file.

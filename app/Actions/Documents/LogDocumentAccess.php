@@ -21,7 +21,7 @@ class LogDocumentAccess
      * @param  OrderDocument  $order_document  The document being viewed.
      * @param  User  $viewer  The authenticated user viewing it.
      * @param  string|null  $ip_address  Request IP, if available.
-     * @return DocumentAccessLog|null  The log row, or null if no log was required.
+     * @return DocumentAccessLog|null The log row, or null if no log was required.
      */
     public function handle(OrderDocument $order_document, User $viewer, ?string $ip_address = null): ?DocumentAccessLog
     {

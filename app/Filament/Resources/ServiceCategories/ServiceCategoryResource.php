@@ -9,6 +9,7 @@ use App\Filament\Resources\ServiceCategories\Schemas\ServiceCategoryForm;
 use App\Filament\Resources\ServiceCategories\Tables\ServiceCategoriesTable;
 use App\Models\ServiceCategory;
 use BackedEnum;
+use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -51,7 +52,7 @@ class ServiceCategoryResource extends Resource
     }
 
     /**
-     * @return array<string, \Filament\Resources\Pages\PageRegistration>
+     * @return array<string, PageRegistration>
      */
     public static function getPages(): array
     {

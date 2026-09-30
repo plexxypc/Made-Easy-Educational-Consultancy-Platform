@@ -1,5 +1,9 @@
 {
     "preset": "laravel",
+    "exclude": [
+        "bootstrap/cache",
+        "storage"
+    ],
     "rules": {
         "no_superfluous_phpdoc_tags": false,
         "no_empty_phpdoc": false,

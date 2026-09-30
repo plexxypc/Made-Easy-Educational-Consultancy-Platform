@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Pages;
 
 use App\Filament\Resources\Orders\Actions\OrderActions;
 use App\Filament\Resources\Orders\OrderResource;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
@@ -16,7 +17,7 @@ class ViewOrder extends ViewRecord
     /**
      * Status actions (staff/admin), Set Total (admin, quote orders), delete/restore (admin).
      *
-     * @return array<int, \Filament\Actions\Action|ActionGroup>
+     * @return array<int, Action|ActionGroup>
      */
     protected function getHeaderActions(): array
     {

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * A file uploaded against an order, stored on the private "local" disk.
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $stored_path Relative to the private "local" disk.
  * @property string $mime_type
  * @property int $size Bytes.
- * @property \Illuminate\Support\Carbon $uploaded_at
+ * @property Carbon $uploaded_at
  */
 #[Fillable(['order_id', 'field_key', 'original_filename', 'stored_path', 'mime_type', 'size'])]
 class OrderDocument extends Model

@@ -24,7 +24,7 @@ class StoreOrderDocument
      * @param  string|null  $field_key  Service "file" field this answers.
      * @return OrderDocument
      *
-     * @throws BusinessRuleException  If the detected MIME type is not allowed.
+     * @throws BusinessRuleException If the detected MIME type is not allowed.
      */
     public function handle(Order $order, UploadedFile $file, ?string $field_key = null): OrderDocument
     {

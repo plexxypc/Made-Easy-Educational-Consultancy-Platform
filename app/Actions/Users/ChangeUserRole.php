@@ -20,9 +20,9 @@ class ChangeUserRole
      * @param  User  $target_user  User whose role changes.
      * @param  UserRole  $new_role  New role.
      * @param  User  $actor  Admin making the change.
-     * @return User  The updated user.
+     * @return User The updated user.
      *
-     * @throws BusinessRuleException  If the actor isn't an admin or targets themselves.
+     * @throws BusinessRuleException If the actor isn't an admin or targets themselves.
      */
     public function handle(User $target_user, UserRole $new_role, User $actor): User
     {

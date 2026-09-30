@@ -25,7 +25,7 @@ class Money
      * @param  string|int|float|null  $naira
      * @return int
      *
-     * @throws InvalidArgumentException  If the value is not a valid non-negative amount.
+     * @throws InvalidArgumentException If the value is not a valid non-negative amount.
      */
     public static function naira_to_kobo(string|int|float|null $naira): int
     {

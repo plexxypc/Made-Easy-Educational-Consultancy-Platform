@@ -6,6 +6,7 @@ use App\Filament\Resources\DocumentAccessLogs\Pages\ListDocumentAccessLogs;
 use App\Filament\Resources\DocumentAccessLogs\Tables\DocumentAccessLogsTable;
 use App\Models\DocumentAccessLog;
 use BackedEnum;
+use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
@@ -39,7 +40,7 @@ class DocumentAccessLogResource extends Resource
     }
 
     /**
-     * @return array<string, \Filament\Resources\Pages\PageRegistration>
+     * @return array<string, PageRegistration>
      */
     public static function getPages(): array
     {

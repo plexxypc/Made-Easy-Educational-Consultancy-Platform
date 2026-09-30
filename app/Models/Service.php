@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_active
  * @property FulfilmentType $fulfilment_type
  * @property array<int, array{key: string, label: string, type: string, required: bool, min?: int, max?: int, options?: array<int, string>}>|null $customer_fields
- *           Shape documented in the create_services_table migration.
+ *                                                                                                                                                                 Shape documented in the create_services_table migration.
  */
 #[Fillable([
     'service_category_id',

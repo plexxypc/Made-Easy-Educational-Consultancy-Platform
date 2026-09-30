@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Audit row: a staff/admin user viewed an order document. Append-only.
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $order_document_id
  * @property int $user_id
  * @property string|null $ip_address
- * @property \Illuminate\Support\Carbon $viewed_at
+ * @property Carbon $viewed_at
  */
 #[Fillable(['order_document_id', 'user_id', 'ip_address'])]
 class DocumentAccessLog extends Model
