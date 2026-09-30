@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Actions\Orders\FindTrackableOrder;
 use App\Actions\Orders\RespondToNeedsAction;
+use App\Actions\Pins\LogPinAccess;
 use App\Enums\OrderStatus;
+use App\Enums\PinStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Http\Requests\LookUpOrderRequest;
 use App\Http\Requests\RespondToOrderRequest;
 use App\Models\Order;
+use App\Models\ResultCheckerPin;
 use App\Support\TrackedOrders;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 /**
@@ -63,11 +68,17 @@ class OrderTrackingController extends Controller
      * Guests see document filenames only; the signed-in owner also gets download
      * links through the existing /documents/{id} route (OrderDocumentPolicy).
      *
+     * Delivered result checker PINs are shown in plaintext to whoever may view
+     * the order. LogPinAccess records it when that viewer is signed in as
+     * staff/admin (e.g. they looked the order up here); customers aren't logged.
+     * The page is never cached.
+     *
      * @param  Request  $request
      * @param  Order  $order
-     * @return View|RedirectResponse
+     * @param  LogPinAccess  $log_pin_access
+     * @return Response|RedirectResponse
      */
-    public function show(Request $request, Order $order): View|RedirectResponse
+    public function show(Request $request, Order $order, LogPinAccess $log_pin_access): Response|RedirectResponse
     {
         if (! TrackedOrders::allows($request, $order)) {
             return redirect()
@@ -78,8 +89,18 @@ class OrderTrackingController extends Controller
 
         $order->load(['service', 'documents' => fn ($query) => $query->orderBy('uploaded_at')->orderBy('id')]);
 
-        return view('orders.show', [
+        $pins = $order->isResultChecker()
+            ? $order->pins()->where('status', PinStatus::Revealed->value)->get()
+            : new Collection;
+
+        if ($request->user() !== null) {
+            $pins->each(fn (ResultCheckerPin $pin) => $log_pin_access->handle($pin, $request->user(), $request->ip()));
+        }
+
+        return response()->view('orders.show', [
             'order' => $order,
+            'pins' => $pins,
+            'undelivered_pins' => $order->undeliveredPinCount(),
             'answers' => $order->labelledFieldAnswers(),
             'timeline' => $order->statusChanges()->whereNotNull('note')->get(),
             'needs_action_note' => $order->status === OrderStatus::NeedsAction ? $order->needsActionNote() : null,
@@ -87,7 +108,7 @@ class OrderTrackingController extends Controller
             'receipt' => $order->receipt,
             'upload_rules' => config('madeeasy.uploads'),
             'max_documents' => RespondToOrderRequest::MAX_DOCUMENTS,
-        ]);
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     /**
@@ -121,23 +142,24 @@ class OrderTrackingController extends Controller
      *
      * Uses the policy-aligned visibleTo scope, further limited to orders the
      * user placed: for staff/admin visibleTo means "everything", which is the
-     * back office's job, not this page's.
+     * back office's job, not this page's. Delivered result checker PINs are
+     * listed with their order, so the page is never cached.
      *
      * @param  Request  $request
-     * @return View
+     * @return Response
      */
-    public function my_requests(Request $request): View
+    public function my_requests(Request $request): Response
     {
         $user = $request->user();
 
-        return view('orders.index', [
+        return response()->view('orders.index', [
             'orders' => Order::query()
                 ->visibleTo($user)
                 ->whereBelongsTo($user)
-                ->with('service')
+                ->with(['service', 'pins' => fn ($query) => $query->where('status', PinStatus::Revealed->value)])
                 ->latest()
                 ->latest('id')
                 ->paginate(15),
-        ]);
+        ])->header('Cache-Control', 'private, no-store');
     }
 }

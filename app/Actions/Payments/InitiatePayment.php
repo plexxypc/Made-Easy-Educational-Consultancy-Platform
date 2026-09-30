@@ -76,6 +76,7 @@ class InitiatePayment
                     'order_reference' => $order->reference,
                     'payment_id' => $payment->id,
                     'service' => $order->service->name,
+                    'quantity' => $order->quantity,
                     'cancel_action' => route('orders.track.show', $order),
                 ],
             );

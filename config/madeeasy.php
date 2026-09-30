@@ -69,6 +69,21 @@ return [
     ],
 
     /*
+     * Result checker PIN stock.
+     *  - low_stock_threshold: the stock widget warns when a service has this
+     *    many available PINs or fewer (one threshold for every service).
+     *  - max_quantity_per_order: largest quantity on "Buy Result Checker".
+     *  - email_staff_on_shortfall: a paid order that couldn't get all its PINs
+     *    always notifies staff in the back office; this also emails them
+     *    (on by default: a customer has paid and is waiting).
+     */
+    'pins' => [
+        'low_stock_threshold' => (int) env('PIN_LOW_STOCK_THRESHOLD', 20),
+        'max_quantity_per_order' => (int) env('PIN_MAX_QUANTITY_PER_ORDER', 10),
+        'email_staff_on_shortfall' => (bool) env('EMAIL_STAFF_ON_PIN_SHORTFALL', true),
+    ],
+
+    /*
      * Customer uploads on service request forms ("file" fields). Files go to the
      * private disk as order_documents. Extensions are checked against the
      * detected (content) MIME type, and the MIME type is re-checked on store.

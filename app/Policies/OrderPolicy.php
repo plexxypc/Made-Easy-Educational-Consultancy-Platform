@@ -89,6 +89,19 @@ class OrderPolicy
     }
 
     /**
+     * "Deliver PIN manually" on a paid result checker order that is still owed PINs.
+     * Which orders qualify is decided by Order::undeliveredPinCount(), not here.
+     *
+     * @param  User  $user
+     * @param  Order  $order
+     * @return bool
+     */
+    public function deliverPins(User $user, Order $order): bool
+    {
+        return $user->isStaffOrAdmin() && ! $order->trashed();
+    }
+
+    /**
      * Set the staff-determined total of a quote-type order.
      *
      * @param  User  $user

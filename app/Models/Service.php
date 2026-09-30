@@ -185,6 +185,30 @@ class Service extends Model
     }
 
     /**
+     * Whether this service is a result checker (instant fulfilment from PIN stock).
+     *
+     * @return bool
+     */
+    public function isResultChecker(): bool
+    {
+        return $this->fulfilment_type === FulfilmentType::Instant;
+    }
+
+    /**
+     * Active result checkers, as sold on the "Buy Result Checker" page.
+     *
+     * @param  Builder<Service>  $query
+     * @return void
+     */
+    #[Scope]
+    protected function resultCheckersForSale(Builder $query): void
+    {
+        $query->where('is_active', true)
+            ->where('fulfilment_type', FulfilmentType::Instant->value)
+            ->where('price', '>', 0);
+    }
+
+    /**
      * Orders placed for this service.
      *
      * @return HasMany<Order, $this>
@@ -192,5 +216,15 @@ class Service extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Result checker PIN stock for this service (all statuses).
+     *
+     * @return HasMany<ResultCheckerPin, $this>
+     */
+    public function pins(): HasMany
+    {
+        return $this->hasMany(ResultCheckerPin::class);
     }
 }

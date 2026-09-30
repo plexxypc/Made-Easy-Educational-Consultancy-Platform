@@ -55,6 +55,8 @@ class PaymentReceiptMail extends Mailable implements ShouldQueue
                 'contact' => config('madeeasy.contact'),
                 'track_url' => route('orders.track.show', $order),
                 'receipt_url' => route('orders.receipt', $order),
+                'is_result_checker' => $order->isResultChecker(),
+                'pin_noun' => $order->quantity > 1 ? 'PINs' : 'PIN',
             ],
         );
     }

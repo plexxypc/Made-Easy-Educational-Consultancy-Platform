@@ -19,10 +19,25 @@
                         <a href="{{ route('orders.track.show', $order) }}" class="flex flex-wrap items-center justify-between gap-3 p-5">
                             <span>
                                 <span class="block text-sm text-slate-500">{{ $order->display_reference }} · {{ $order->created_at->format('j M Y') }}</span>
-                                <span class="mt-1 block text-lg font-semibold text-slate-900">{{ $order->service->name }}</span>
+                                <span class="mt-1 block text-lg font-semibold text-slate-900">{{ $order->serviceLabel() }}</span>
                             </span>
                             <x-public.status-badge :status="$order->status" />
                         </a>
+                        @if ($order->pins->isNotEmpty())
+                            <div class="border-t border-slate-100 px-5 py-3">
+                                <p class="text-sm font-semibold text-slate-600">Your {{ $order->pins->count() > 1 ? 'PINs' : 'PIN' }}</p>
+                                <ul class="mt-1 space-y-1">
+                                    @foreach ($order->pins as $pin)
+                                        <li class="font-mono text-lg font-bold tracking-wider text-slate-900">
+                                            {{ $pin->pin }}
+                                            @if ($pin->serial_number)
+                                                <span class="ml-2 font-sans text-sm font-normal text-slate-600">Serial {{ $pin->serial_number }}</span>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
                         @if ($order->canBePaid())
                             <form method="POST" action="{{ route('orders.pay', $order) }}" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
                                 @csrf

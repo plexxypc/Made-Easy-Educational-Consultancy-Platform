@@ -5,6 +5,7 @@ use App\Http\Controllers\OrderDocumentController;
 use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\PaystackWebhookController;
+use App\Http\Controllers\ResultCheckerController;
 use App\Http\Controllers\ServiceCatalogueController;
 use App\Http\Controllers\ServiceRequestController;
 use App\Livewire\Hello;
@@ -51,8 +52,13 @@ Route::get('track/{order:reference}/receipt', [OrderPaymentController::class, 'r
 // Server-to-server from Paystack; CSRF-exempt (bootstrap/app.php), authenticated by signature.
 Route::post('webhooks/paystack', PaystackWebhookController::class)->name('webhooks.paystack');
 
-// Placeholders: the result checker store and updates/blog are built in later prompts.
-Route::view('result-checker', 'pages.result-checker')->name('result-checker');
+// "Buy Result Checker": choose, pay, receive PINs. Orders then use the normal tracking/payment routes.
+Route::get('result-checker', [ResultCheckerController::class, 'index'])->name('result-checker');
+Route::post('result-checker/buy', [ResultCheckerController::class, 'buy'])
+    ->middleware(['throttle:service-requests', 'throttle:order-payments'])
+    ->name('result-checker.buy');
+
+// Placeholder: updates/blog is built in a later prompt.
 Route::view('updates', 'pages.updates')->name('updates');
 
 Route::view('about', 'pages.about')->name('about');

@@ -38,6 +38,15 @@ class OrderInfolist
                     ->visible(fn (Order $record): bool => $record->payments()->whereNotNull('review_reason')->exists())
                     ->columnSpanFull(),
 
+                Callout::make('PINs still to deliver')
+                    ->description(fn (Order $record): string => trans_choice(
+                        'The customer has paid but :count PIN could not be allocated (stock ran out). Use "Deliver PIN manually" once stock is topped up, or enter one yourself.|The customer has paid but :count PINs could not be allocated (stock ran out). Use "Deliver PIN manually" once stock is topped up, or enter them yourself.',
+                        $record->undeliveredPinCount(),
+                    ))
+                    ->danger()
+                    ->visible(fn (Order $record): bool => $record->undeliveredPinCount() > 0)
+                    ->columnSpanFull(),
+
                 Section::make('Order')
                     ->columns(2)
                     ->columnSpan(2)
@@ -53,6 +62,9 @@ class OrderInfolist
                             ->state(fn (Order $record): string => $record->awaitsQuote() ? 'Awaiting quote' : Money::format($record->total_amount)),
                         TextEntry::make('service.name')
                             ->label('Service'),
+                        TextEntry::make('quantity')
+                            ->state(fn (Order $record): string => $record->quantity.' · '.$record->pins()->count().' delivered')
+                            ->visible(fn (Order $record): bool => $record->isResultChecker()),
                         TextEntry::make('service.fulfilment_type')
                             ->label('Fulfilment')
                             ->badge(),

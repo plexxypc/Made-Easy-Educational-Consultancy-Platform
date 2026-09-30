@@ -4,14 +4,19 @@ namespace App\Filament\Resources\Orders\Actions;
 
 use App\Actions\Orders\ChangeOrderStatus;
 use App\Actions\Orders\SetOrderTotal;
+use App\Actions\Pins\AllocatePinsToOrder;
+use App\Actions\Pins\DeliverOneOffPin;
 use App\Enums\OrderStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Order;
+use App\Models\ResultCheckerPin;
 use App\Support\Money;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 
 /**
@@ -112,6 +117,73 @@ class OrderActions
                 self::run($action, fn () => $set_order_total->handle($record, Money::naira_to_kobo($data['total']), auth()->user()));
 
                 Notification::make()->success()->title('Total set to '.Money::format($record->refresh()->total_amount))->send();
+            });
+    }
+
+    /**
+     * "Deliver PIN manually" for a paid result checker order still owed PINs
+     * (stock ran out at payment time). Staff either send from stock once it
+     * has been topped up, or enter one PIN they obtained themselves.
+     *
+     * @return Action
+     */
+    public static function deliver_pins(): Action
+    {
+        return Action::make('deliverPins')
+            ->label('Deliver PIN manually')
+            ->icon(Heroicon::OutlinedKey)
+            ->color('danger')
+            ->authorize('deliverPins')
+            ->visible(fn (Order $record): bool => $record->undeliveredPinCount() > 0)
+            ->modalDescription(fn (Order $record): string => trans_choice(
+                'This order is paid but still waiting for :count PIN. The customer is emailed as soon as it is delivered.|This order is paid but still waiting for :count PINs. The customer is emailed as soon as they are delivered.',
+                $record->undeliveredPinCount(),
+            ))
+            ->schema([
+                Radio::make('method')
+                    ->label('How?')
+                    ->options(fn (Order $record): array => [
+                        'stock' => 'Send from stock ('.ResultCheckerPin::query()->available()->where('service_id', $record->service_id)->count().' available now)',
+                        'one_off' => 'Enter one PIN myself',
+                    ])
+                    ->default('stock')
+                    ->required()
+                    ->live(),
+                TextInput::make('pin')
+                    ->label('PIN')
+                    ->required()
+                    ->maxLength(ResultCheckerPin::MAX_LENGTH + 20)
+                    ->autocomplete(false)
+                    ->visible(fn (Get $get): bool => $get('method') === 'one_off'),
+                TextInput::make('serial_number')
+                    ->label('Serial number (optional)')
+                    ->maxLength(ResultCheckerPin::MAX_LENGTH + 20)
+                    ->autocomplete(false)
+                    ->visible(fn (Get $get): bool => $get('method') === 'one_off'),
+            ])
+            ->action(function (Order $record, array $data, Action $action, AllocatePinsToOrder $allocate_pins_to_order, DeliverOneOffPin $deliver_one_off_pin): void {
+                if (($data['method'] ?? 'stock') === 'one_off') {
+                    self::run($action, fn () => $deliver_one_off_pin->handle($record, (string) $data['pin'], $data['serial_number'] ?? null, auth()->user()));
+
+                    Notification::make()->success()->title('PIN delivered to the customer')->send();
+
+                    return;
+                }
+
+                $result = $allocate_pins_to_order->handle($record);
+
+                $notification = match (true) {
+                    $result['allocated'] === 0 => Notification::make()->warning()
+                        ->title('No PINs in stock for '.$record->service->name)
+                        ->body('Upload more under Catalogue → PIN stock, or enter a PIN yourself.'),
+                    $result['undelivered'] > 0 => Notification::make()->warning()
+                        ->title(trans_choice(':count PIN delivered|:count PINs delivered', $result['allocated']))
+                        ->body(trans_choice(':count is still waiting: stock ran out again.|:count are still waiting: stock ran out again.', $result['undelivered'])),
+                    default => Notification::make()->success()
+                        ->title(trans_choice(':count PIN delivered; order completed|:count PINs delivered; order completed', $result['allocated'])),
+                };
+
+                $notification->send();
             });
     }
 

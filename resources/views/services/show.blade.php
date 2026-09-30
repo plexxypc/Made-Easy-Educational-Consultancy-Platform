@@ -31,7 +31,7 @@
             {{-- Instant services (result checker PINs) are sold through the result checker store. --}}
             <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
                 <p class="text-lg font-semibold text-slate-900">Available from our Result Checker page</p>
-                <p class="mt-2 text-slate-600">Online purchase is coming soon.</p>
+                <p class="mt-2 text-slate-600">Buy online and get your PIN by email as soon as your payment is confirmed.</p>
                 <x-public.button :href="route('result-checker')" class="mt-4">Go to Result Checker</x-public.button>
             </div>
         @else

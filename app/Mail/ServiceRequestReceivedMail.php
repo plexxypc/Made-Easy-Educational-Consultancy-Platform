@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Order;
+use App\Support\Money;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -51,9 +52,10 @@ class ServiceRequestReceivedMail extends Mailable implements ShouldQueue
             with: [
                 'customer_name' => $this->order->customer_name,
                 'reference' => $this->order->display_reference,
-                'service_name' => $this->order->service->name,
-                'price_label' => $this->order->service->priceLabel(),
+                'service_name' => $this->order->serviceLabel(),
+                'price_label' => $this->order->isQuote() ? $this->order->service->priceLabel() : Money::format($this->order->total_amount, hide_zero_kobo: true),
                 'is_quote' => $this->order->isQuote(),
+                'is_result_checker' => $this->order->isResultChecker(),
                 'contact' => config('madeeasy.contact'),
                 'track_url' => route('orders.track.show', $this->order),
             ],

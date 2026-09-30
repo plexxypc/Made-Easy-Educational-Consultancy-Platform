@@ -22,6 +22,7 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            OrderActions::deliver_pins(),
             OrderActions::set_total(),
             OrderActions::mark_in_progress(),
             OrderActions::mark_completed(),

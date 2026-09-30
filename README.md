@@ -183,7 +183,8 @@ They use the `<x-public-layout>` component. The nav comes from
 | `/services` | All categories with active services and prices |
 | `/services/{category}` | One category (Admission = `admission-services`, Documents = `document-services`) |
 | `/services/{category}/{service}` | Service detail and the **Request this service** form |
-| `/result-checker`, `/updates` | Placeholders until their later prompts |
+| `/result-checker` | **Buy Result Checker**: pick a checker and quantity, then **Buy now** straight to Paystack |
+| `/updates` | Placeholder until its later prompt |
 | `/about`, `/contact` | About (placeholder copy) and Contact |
 | `/track` | **Track your request**: reference plus the email or phone used |
 | `/track/{reference}` | Order page: status, answers, documents, messages, **Pay now**, receipt and the needs-action response form |
@@ -206,7 +207,8 @@ set in the admin under Services, then "Information required from the customer".
   random code such as `ME-7K2QXD` (`Order::generateReference()`, Crockford
   base32, unique). Orders created before this change keep their old numeric
   reference (shown as `#12`). Submissions are rate-limited to 5 per minute per IP.
-- Instant services (result checkers) and inactive services can't be requested.
+- Instant services (result checkers) and inactive services can't be requested
+  through this form; result checkers are bought on `/result-checker`.
 
 **Order tracking.** `App\Actions\Orders\FindTrackableOrder` matches the
 reference against the guest or account email (any case), or the phone number
@@ -263,6 +265,37 @@ with a total above ₦0. A quote order becomes payable only after **Set Total**
 Set the webhook URL in the Paystack dashboard to `https://<domain>/webhooks/paystack`.
 To test locally, expose the site with a tunnel (e.g. ngrok) and use test keys.
 
+**Result checker PINs.** A result checker is an active **instant** service
+priced above ₦0 (`Service::resultCheckersForSale()`).
+
+- **Buying.** `/result-checker` (`ResultCheckerController`, `BuyResultCheckerRequest`)
+  takes the checker, a quantity (1 to `PIN_MAX_QUANTITY_PER_ORDER`) and contact
+  details. It reuses the normal flow: `CreateServiceRequest` makes a
+  `pending_payment` order with `quantity` and `total_amount = price × quantity`,
+  then `InitiatePayment` sends the customer to Paystack. There is no form to fill
+  in and no second checkout. Guests keep session access to the order, as with requests.
+- **Stock.** `result_checker_pins` holds each PIN and optional serial number.
+  Both use Laravel's `encrypted` cast; `pin_hash` (an HMAC keyed with `APP_KEY`)
+  enforces uniqueness across all services. Status: `available` → `allocated` →
+  `revealed` (shown as "Delivered": emailed and visible to the customer).
+- **Allocation.** `ConfirmPaystackCharge` fires `App\Events\OrderPaid` after it
+  applies a charge. The queued listener `AllocateResultCheckerPins` runs
+  `App\Actions\Pins\AllocatePinsToOrder`. In one transaction it locks the order
+  and claims up to `quantity` available PINs with `SELECT … FOR UPDATE SKIP LOCKED`,
+  so two payments never get the same PIN. `DeliverAllocatedPins` then marks them
+  delivered, emails them (`ResultCheckerPinsMail`), and completes the order
+  automatically once every unit has a PIN.
+- **Short stock.** If stock runs out, the order stays `paid` (the money is never
+  refused), what is available is delivered, and the rest is flagged. Staff get
+  `PinsNeedManualFulfilment` in the bell (plus email when
+  `EMAIL_STAFF_ON_PIN_SHORTFALL=true`), the order shows a red "PINs still to
+  deliver" callout, and the order can't be marked completed until it is fully
+  delivered. The fix is **Deliver PIN manually** on the order: allocate from
+  stock after a top-up, or type in a one-off PIN.
+- **Customers** see their PINs on the order tracking page and in My Requests
+  (served with `Cache-Control: no-store`). They see "N PINs on the way" while
+  any are owed.
+
 **Contact details** (Contact page, footer, emails) come from the `CONTACT_*`
 variables in `.env`. After changing them in production, run
 `docker compose exec app php artisan config:cache`.
@@ -278,7 +311,22 @@ With `LOG_CHANNEL=stderr` and `MAIL_MAILER=log`, emails appear in
 | Orders | staff, admin | List, filters, detail, status actions, documents |
 | Catalogue: Services / Categories | admin | Prices typed in naira and stored as kobo |
 | Administration: Users & roles | admin | Change role; admins cannot change their own role |
-| Administration: Document access log | admin | Read-only; search by staff member or order # |
+| Catalogue: PIN stock | admin | Upload PINs (paste one per line or CSV of `pin[,serial]`); PINs always masked; per-service stock widget |
+| Orders → PINs tab | staff, admin | Result checker orders only; **Show PIN** is audited |
+| Administration: Access log (documents & PINs) | admin | Read-only; search by staff member or order reference |
+
+**PIN uploads** (`App\Actions\Pins\ImportPinBatch`) are all-or-nothing. Any
+malformed line, duplicate within the batch, or PIN already in stock (for any
+service) rejects the whole batch, with the line numbers listed. The dashboard
+widget shows available PINs per checker, amber at or below
+`PIN_LOW_STOCK_THRESHOLD` and red at zero, plus how many paid orders are waiting.
+
+**Sensitive access audit.** Staff/admin opening a customer document
+(`LogDocumentAccess`) or revealing an allocated PIN (`LogPinAccess`) writes a
+row to `document_access_logs`. PIN rows use `result_checker_pin_id` instead of
+`order_document_id`. Customers viewing their own PINs are not logged.
+PIN values never appear in any list, only in the Show PIN modal on the order
+they belong to.
 
 Access is enforced by the policies in `app/Policies`, not only by hidden
 navigation. Business rules live in `app/Actions`, and Filament only calls them.
@@ -332,6 +380,21 @@ docker run --rm -v "$PWD:/var/www/html" -v madeeasy_test_vendor:/var/www/html/ve
 ```
 
 (PowerShell: use `"${PWD}:/var/www/html"`.) Tests use in-memory SQLite from `phpunit.xml`.
+
+`PinAllocationConcurrencyTest` needs real row locks, so it is skipped on SQLite.
+It starts several PHP processes that allocate from the same stock at the same
+moment. To run it, and the whole suite, against PostgreSQL, create a separate
+test database once (never point tests at `madeeasy`, because they wipe it), then
+pass the connection in:
+
+```bash
+docker compose exec -T db createdb -U madeeasy madeeasy_test
+docker run --rm --network madeeasy_internal \
+  -e DB_CONNECTION=pgsql -e DB_HOST=db -e DB_DATABASE=madeeasy_test \
+  -e DB_USERNAME=madeeasy -e DB_PASSWORD="<DB_PASSWORD from .env>" \
+  -v "$PWD:/var/www/html" -v madeeasy_test_vendor:/var/www/html/vendor \
+  --user root --entrypoint sh madeeasy-app:latest -c "php artisan test"
+```
 
 ## First deploy: Hostinger VPS checklist
 

@@ -9,6 +9,8 @@ Your request has been received.
 
 @if ($is_quote)
 This service is priced per request. We'll review your details and tell you the price before you pay anything.
+@elseif ($is_result_checker)
+As soon as your payment is confirmed we'll email your PIN and show it on your order page. If your payment didn't go through, you can pay from your order page.
 @else
 No payment has been taken yet. You can pay securely online from your request page.
 @endif

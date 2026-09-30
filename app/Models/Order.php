@@ -20,7 +20,7 @@ use Illuminate\Support\Carbon;
 /**
  * A customer's order for one service.
  *
- * `reference`, `user_id`, `status`, `total_amount` and the quote columns are deliberately NOT
+ * `reference`, `user_id`, `quantity`, `status`, `total_amount` and the quote columns are deliberately NOT
  * mass-assignable: ownership and the amount are set server-side, and status only
  * changes through App\Actions\Orders\ChangeOrderStatus (or the payment webhook).
  *
@@ -28,8 +28,9 @@ use Illuminate\Support\Carbon;
  * @property string $reference Customer-facing: "ME-XXXXXX", or the old order number ("12") for orders placed before random references.
  * @property int|null $user_id Null for guest orders (guest_* columns filled instead).
  * @property int $service_id
+ * @property int $quantity Units ordered; above 1 only for result checkers.
  * @property OrderStatus $status
- * @property int $total_amount Amount in KOBO.
+ * @property int $total_amount Amount in KOBO (service price × quantity).
  * @property string|null $guest_name
  * @property string|null $guest_email
  * @property string|null $guest_phone
@@ -53,6 +54,7 @@ class Order extends Model
      */
     protected $attributes = [
         'status' => 'pending_payment',
+        'quantity' => 1,
     ];
 
     /**
@@ -142,6 +144,7 @@ class Order extends Model
     {
         return [
             'user_id' => 'integer',
+            'quantity' => 'integer',
             'status' => OrderStatus::class,
             'total_amount' => 'integer',
             'field_answers' => 'array',
@@ -187,6 +190,47 @@ class Order extends Model
     }
 
     /**
+     * Whether this is a result checker order (instant fulfilment: PINs from stock).
+     *
+     * @return bool
+     */
+    public function isResultChecker(): bool
+    {
+        return $this->service?->fulfilment_type === FulfilmentType::Instant;
+    }
+
+    /**
+     * Whether PINs may be allocated to this order now: a paid (or in-progress)
+     * result checker order that hasn't been deleted.
+     *
+     * @return bool
+     */
+    public function canReceivePins(): bool
+    {
+        return $this->isResultChecker()
+            && ! $this->trashed()
+            && in_array($this->status, [OrderStatus::Paid, OrderStatus::InProgress], true);
+    }
+
+    /**
+     * PINs paid for but not yet allocated (0 for anything that isn't a paid result checker order).
+     *
+     * Business rule (PIN stock fallback): when stock runs out at payment time
+     * the order stays paid and this number is what staff still owe the
+     * customer ("Deliver PIN manually" on the order screen).
+     *
+     * @return int
+     */
+    public function undeliveredPinCount(): int
+    {
+        if (! $this->canReceivePins()) {
+            return 0;
+        }
+
+        return max(0, $this->quantity - $this->pins()->count());
+    }
+
+    /**
      * Whether a quote order still has no staff-determined total.
      *
      * @return bool
@@ -205,6 +249,8 @@ class Order extends Model
      *  - An order still owing money (awaitingPayment()) can't be worked on or
      *    completed. It moves on once the verified Paystack webhook marks it paid,
      *    or straight away if its total is ₦0. Needs action and cancel stay available.
+     *  - A result checker order can't be marked completed while PINs are still
+     *    owed; it completes itself once every PIN has been delivered.
      *
      * @param  OrderStatus  $next_status
      * @return bool
@@ -217,6 +263,10 @@ class Order extends Model
 
         if ($this->awaitsQuote()) {
             return $next_status === OrderStatus::Cancelled;
+        }
+
+        if ($next_status === OrderStatus::Completed && $this->isResultChecker() && $this->pins()->count() < $this->quantity) {
+            return false;
         }
 
         $progresses_work = in_array($next_status, [OrderStatus::InProgress, OrderStatus::Completed], true);
@@ -422,6 +472,28 @@ class Order extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(OrderDocument::class);
+    }
+
+    /**
+     * Result checker PINs allocated to this order, in allocation order.
+     *
+     * @return HasMany<ResultCheckerPin, $this>
+     */
+    public function pins(): HasMany
+    {
+        return $this->hasMany(ResultCheckerPin::class)->orderBy('allocated_at')->orderBy('id');
+    }
+
+    /**
+     * Service name with the quantity, e.g. "WAEC Result Checker × 3".
+     *
+     * @return string
+     */
+    public function serviceLabel(): string
+    {
+        $name = (string) $this->service?->name;
+
+        return $this->quantity > 1 ? "{$name} × {$this->quantity}" : $name;
     }
 
     /**

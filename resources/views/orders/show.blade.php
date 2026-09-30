@@ -9,7 +9,7 @@
         <div class="mt-2 flex flex-wrap items-start justify-between gap-3">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Reference {{ $order->display_reference }}</p>
-                <h1 class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">{{ $order->service->name }}</h1>
+                <h1 class="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">{{ $order->serviceLabel() }}</h1>
                 <p class="mt-1 text-sm text-slate-500">Submitted {{ $order->created_at->format('j M Y, g:ia') }}</p>
             </div>
             <x-public.status-badge :status="$order->status" class="text-base" />
@@ -20,8 +20,44 @@
         @endif
 
         <p class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-lg text-slate-800 shadow-sm">
-            {{ $order->status->customerDescription() }}
+            @if ($order->isResultChecker() && $order->status === \App\Enums\OrderStatus::Paid)
+                Payment received. We're sending your {{ $order->quantity > 1 ? 'PINs' : 'PIN' }}.
+            @else
+                {{ $order->status->customerDescription() }}
+            @endif
         </p>
+
+        @if ($pins->isNotEmpty())
+            {{-- The customer's own PINs: shown in full, not audited (LogPinAccess only records staff/admin viewers). --}}
+            <section class="mt-6 rounded-2xl border-2 border-emerald-300 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="pins-heading">
+                <h2 id="pins-heading" class="text-xl font-bold text-slate-900">Your {{ $pins->count() > 1 ? 'PINs' : 'PIN' }}</h2>
+                <p class="mt-1 text-sm text-slate-600">Keep {{ $pins->count() > 1 ? 'them' : 'it' }} private: anyone with a PIN can use it. We've also emailed {{ $pins->count() > 1 ? 'them' : 'it' }} to you.</p>
+                <ol class="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
+                    @foreach ($pins as $pin)
+                        <li class="grid gap-1 px-4 py-3 sm:grid-cols-3 sm:items-center">
+                            <span class="text-sm font-semibold text-slate-500">{{ $order->service->name }} {{ $pins->count() > 1 ? '#'.$loop->iteration : '' }}</span>
+                            <span class="font-mono text-xl font-bold tracking-wider text-slate-900">{{ $pin->pin }}</span>
+                            <span class="text-sm text-slate-600">
+                                @if ($pin->serial_number)
+                                    Serial: <span class="font-mono text-slate-900">{{ $pin->serial_number }}</span>
+                                @endif
+                            </span>
+                        </li>
+                    @endforeach
+                </ol>
+            </section>
+        @endif
+
+        @if ($undelivered_pins > 0)
+            <section class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5" aria-labelledby="pins-pending-heading">
+                <h2 id="pins-pending-heading" class="text-lg font-bold text-amber-900">
+                    {{ $undelivered_pins }} {{ $undelivered_pins === 1 ? 'PIN is' : 'PINs are' }} on the way
+                </h2>
+                <p class="mt-1 text-slate-800">
+                    Your payment is confirmed. Our team is sending {{ $undelivered_pins === 1 ? 'your PIN' : 'the rest of your PINs' }} and will email you as soon as {{ $undelivered_pins === 1 ? "it's" : "they're" }} ready, usually within working hours. You don't need to do anything or pay again.
+                </p>
+            </section>
+        @endif
 
         @error('payment')
             <div class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800" role="alert">{{ $message }}</div>

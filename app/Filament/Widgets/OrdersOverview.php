@@ -10,7 +10,8 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Dashboard order counts for staff/admin. Revenue stats arrive with payments.
+ * Dashboard order counts for staff/admin. PIN stock and orders waiting for
+ * PINs are in PinStockOverview.
  */
 class OrdersOverview extends StatsOverviewWidget
 {

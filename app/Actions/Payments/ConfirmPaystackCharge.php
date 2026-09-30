@@ -5,6 +5,7 @@ namespace App\Actions\Payments;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
+use App\Events\OrderPaid;
 use App\Mail\PaymentReceiptMail;
 use App\Models\Order;
 use App\Models\OrderStatusChange;
@@ -37,6 +38,8 @@ use Illuminate\Support\Facades\Notification;
  *    notified: a human must decide (refund, top-up, or apply manually).
  *  - On success: payment "successful", order "paid", a status-history entry
  *    (shown to the customer), a receipt snapshot, and a queued receipt email.
+ *    Then OrderPaid is dispatched (once, after commit); fulfilment such as
+ *    result checker PIN allocation lives in its listeners, not here.
  */
 class ConfirmPaystackCharge
 {
@@ -117,7 +120,7 @@ class ConfirmPaystackCharge
                 'customer_name' => $order->customer_name,
                 'customer_email' => $order->customer_email,
                 'customer_phone' => $order->guest_phone,
-                'service_name' => $order->service->name,
+                'service_name' => $order->serviceLabel(),
                 'amount' => $paid_amount,
                 'currency' => $locked_payment->currency,
                 'payment_status' => PaymentStatus::Successful->getLabel(),
@@ -135,6 +138,10 @@ class ConfirmPaystackCharge
 
         if ($receipt !== null && $receipt->customer_email !== null) {
             Mail::to($receipt->customer_email)->queue(new PaymentReceiptMail($receipt));
+        }
+
+        if ($outcome === self::APPLIED) {
+            OrderPaid::dispatch($payment->order, $payment);
         }
 
         return $outcome;

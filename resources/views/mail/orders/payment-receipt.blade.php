@@ -26,7 +26,11 @@ Thank you, we've received your payment. Here is your receipt.
 View or download receipt
 </x-mail::button>
 
+@if ($is_result_checker)
+Your result checker {{ $pin_noun }} will arrive in a separate email and will also be shown on [your request page]({{ $track_url }}).
+@else
 We'll now start work on your request. You can follow its progress on [your request page]({{ $track_url }}).
+@endif
 
 **Phone / WhatsApp:** {{ $contact['phone'] }}<br>
 **Email:** {{ $contact['email'] }}
