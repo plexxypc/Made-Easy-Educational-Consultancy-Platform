@@ -2,6 +2,7 @@
 
 namespace App\Actions\Payments;
 
+use App\Actions\Consultations\RenewConsultationHold;
 use App\Enums\PaymentStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Order;
@@ -23,14 +24,18 @@ use Illuminate\Support\Facades\Log;
  *    (Paystack references can't be reused). Abandoned attempts simply stay
  *    `initiated`; only a verified webhook ever marks anything paid.
  *  - If Paystack refuses to start the transaction the payment is `failed`.
+ *  - Consultation orders: the booked slot must still be available to this
+ *    customer, and its hold restarts (RenewConsultationHold).
  */
 class InitiatePayment
 {
     /**
      * @param  PaystackClient  $paystack
+     * @param  RenewConsultationHold  $renew_consultation_hold
      */
     public function __construct(
         private readonly PaystackClient $paystack,
+        private readonly RenewConsultationHold $renew_consultation_hold,
     ) {}
 
     /**
@@ -51,6 +56,10 @@ class InitiatePayment
 
             if ($blocker !== null) {
                 throw new BusinessRuleException($blocker);
+            }
+
+            if ($locked_order->isConsultation()) {
+                $this->renew_consultation_hold->handle($locked_order);
             }
 
             $payment = new Payment([

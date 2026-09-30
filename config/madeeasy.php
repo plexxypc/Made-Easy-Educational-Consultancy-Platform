@@ -70,8 +70,10 @@ return [
 
     /*
      * Result checker PIN stock.
-     *  - low_stock_threshold: the stock widget warns when a service has this
-     *    many available PINs or fewer (one threshold for every service).
+     *  - low_stock_threshold: DEFAULT low-stock level, used for any service
+     *    whose own "low stock at" value (services.pin_low_stock_threshold) is
+     *    empty. At or below it, the stock widget warns and staff are notified
+     *    (bell + email) once per crossing; again at zero.
      *  - max_quantity_per_order: largest quantity on "Buy Result Checker".
      *  - email_staff_on_shortfall: a paid order that couldn't get all its PINs
      *    always notifies staff in the back office; this also emails them
@@ -81,6 +83,26 @@ return [
         'low_stock_threshold' => (int) env('PIN_LOW_STOCK_THRESHOLD', 20),
         'max_quantity_per_order' => (int) env('PIN_MAX_QUANTITY_PER_ORDER', 10),
         'email_staff_on_shortfall' => (bool) env('EMAIL_STAFF_ON_PIN_SHORTFALL', true),
+    ],
+
+    /*
+     * Consultation booking (/book-consultation).
+     *  - timezone: slot dates and times are wall-clock times in this zone
+     *    (the app itself runs in UTC).
+     *  - hold_minutes: choosing a slot holds it for this long while the
+     *    customer pays; after that it is free for others again.
+     *  - min_notice_minutes: slots starting sooner than this can't be booked.
+     *  - booking_window_days: how far ahead the booking page lists slots.
+     *  - default_duration_minutes: length of a new slot unless changed.
+     *  - max_slots_per_batch: cap on "Add recurring slots" in one go.
+     */
+    'consultations' => [
+        'timezone' => env('CONSULTATION_TIMEZONE', 'Africa/Lagos'),
+        'hold_minutes' => (int) env('CONSULTATION_HOLD_MINUTES', 30),
+        'min_notice_minutes' => (int) env('CONSULTATION_MIN_NOTICE_MINUTES', 60),
+        'booking_window_days' => (int) env('CONSULTATION_BOOKING_WINDOW_DAYS', 60),
+        'default_duration_minutes' => 60,
+        'max_slots_per_batch' => 300,
     ],
 
     /*

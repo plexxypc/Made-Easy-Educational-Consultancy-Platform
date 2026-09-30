@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\ResultCheckerPins\Tables;
 
+use App\Actions\Pins\CheckPinStockLevel;
 use App\Enums\FulfilmentType;
 use App\Enums\PinStatus;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Models\ResultCheckerPin;
+use App\Models\Service;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -85,18 +87,37 @@ class ResultCheckerPinsTable
             ->recordActions([
                 // Hidden by the policy for PINs already given to an order.
                 DeleteAction::make()
-                    ->modalDescription('Remove this unused PIN from stock? It will not be sold.'),
+                    ->modalDescription('Remove this unused PIN from stock? It will not be sold.')
+                    ->after(fn (ResultCheckerPin $record) => self::recheck_stock([$record->service_id])),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->label('Delete unused PINs')
                         ->modalDescription('Only PINs that were never allocated to an order are deleted; any others are skipped.')
-                        ->using(fn (Collection $records): int => ResultCheckerPin::query()
-                            ->whereKey($records->modelKeys())
-                            ->available()
-                            ->delete()),
+                        ->using(function (Collection $records): int {
+                            $deleted = ResultCheckerPin::query()
+                                ->whereKey($records->modelKeys())
+                                ->available()
+                                ->delete();
+
+                            self::recheck_stock($records->pluck('service_id')->unique()->all());
+
+                            return $deleted;
+                        }),
                 ]),
             ]);
+    }
+
+    /**
+     * Deleting stock can take a service to "low" or "out": alert staff if so.
+     *
+     * @param  array<int, int>  $service_ids
+     * @return void
+     */
+    private static function recheck_stock(array $service_ids): void
+    {
+        Service::query()->whereKey($service_ids)->get()
+            ->each(fn (Service $service) => app(CheckPinStockLevel::class)->handle($service));
     }
 }

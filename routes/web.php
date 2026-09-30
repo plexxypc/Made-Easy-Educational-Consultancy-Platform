@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ConsultationBookingController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderDocumentController;
 use App\Http\Controllers\OrderPaymentController;
@@ -57,6 +58,12 @@ Route::get('result-checker', [ResultCheckerController::class, 'index'])->name('r
 Route::post('result-checker/buy', [ResultCheckerController::class, 'buy'])
     ->middleware(['throttle:service-requests', 'throttle:order-payments'])
     ->name('result-checker.buy');
+
+// "Book a consultation": pick a slot, pay. Orders then use the normal tracking/payment routes.
+Route::get('book-consultation', [ConsultationBookingController::class, 'index'])->name('book-consultation');
+Route::post('book-consultation', [ConsultationBookingController::class, 'book'])
+    ->middleware(['throttle:service-requests', 'throttle:order-payments'])
+    ->name('book-consultation.book');
 
 // Placeholder: updates/blog is built in a later prompt.
 Route::view('updates', 'pages.updates')->name('updates');

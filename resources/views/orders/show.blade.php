@@ -22,10 +22,83 @@
         <p class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-lg text-slate-800 shadow-sm">
             @if ($order->isResultChecker() && $order->status === \App\Enums\OrderStatus::Paid)
                 Payment received. We're sending your {{ $order->quantity > 1 ? 'PINs' : 'PIN' }}.
+            @elseif ($booking?->status === \App\Enums\ConsultationBookingStatus::Confirmed)
+                Your consultation is booked. See the details below.
+            @elseif ($booking?->needsRebooking())
+                Payment received. We need to arrange a new time for your consultation.
+            @elseif ($booking && $order->status === \App\Enums\OrderStatus::Paid)
+                Payment received. We're confirming your consultation time.
+            @elseif ($booking && $order->status === \App\Enums\OrderStatus::PendingPayment)
+                Your consultation time is chosen. Pay below to confirm it.
             @else
                 {{ $order->status->customerDescription() }}
             @endif
         </p>
+
+        @if ($booking)
+            @php($slot = $booking->slot)
+            <section @class([
+                'mt-6 rounded-2xl border-2 bg-white p-5 shadow-sm sm:p-6',
+                'border-emerald-300' => $booking->status === \App\Enums\ConsultationBookingStatus::Confirmed,
+                'border-amber-300' => $booking->needsRebooking(),
+                'border-slate-200' => ! in_array($booking->status, [\App\Enums\ConsultationBookingStatus::Confirmed], true) && ! $booking->needsRebooking(),
+            ]) aria-labelledby="booking-heading">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 id="booking-heading" class="text-xl font-bold text-slate-900">Your consultation</h2>
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{{ $booking->statusLabel() }}</span>
+                </div>
+
+                @if ($booking->needsRebooking())
+                    <p class="mt-3 rounded-xl bg-amber-50 p-4 text-slate-800">
+                        The time below was taken or became unavailable while your payment was being completed. Your payment is safe:
+                        our team will contact you to arrange a new time (or a refund if you prefer). You don't need to pay again.
+                    </p>
+                @endif
+
+                <dl class="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
+                    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+                        <dt class="text-sm font-semibold text-slate-600">Date</dt>
+                        <dd class="text-slate-900 sm:col-span-2">{{ $slot->dateLabel() }}</dd>
+                    </div>
+                    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+                        <dt class="text-sm font-semibold text-slate-600">Time</dt>
+                        <dd class="text-slate-900 sm:col-span-2">{{ $slot->timeLabel() }}</dd>
+                    </div>
+                    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+                        <dt class="text-sm font-semibold text-slate-600">Type</dt>
+                        <dd class="text-slate-900 sm:col-span-2">{{ $slot->consultation_type->getLabel() }}</dd>
+                    </div>
+                    @if ($slot->consultation_type->needsMeetingLink() && ! $booking->status->isFinal())
+                        <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+                            <dt class="text-sm font-semibold text-slate-600">Meeting link</dt>
+                            <dd class="sm:col-span-2">
+                                @if (filled($booking->meeting_link))
+                                    <a href="{{ $booking->meeting_link }}" class="break-all font-semibold text-brand-700 underline" target="_blank" rel="noopener noreferrer">{{ $booking->meeting_link }}</a>
+                                @else
+                                    {{-- Placeholder until staff add the link by hand ("Add meeting link" in the admin); none is generated. --}}
+                                    <span class="inline-block rounded-lg border border-dashed border-amber-400 bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">To be added by our team</span>
+                                    <span class="mt-1 block text-sm text-slate-600">We'll email it to you and show it here before your consultation.</span>
+                                @endif
+                            </dd>
+                        </div>
+                    @endif
+                </dl>
+
+                @if (in_array($booking->status, [\App\Enums\ConsultationBookingStatus::Confirmed], true) && ! ($slot->consultation_type->needsMeetingLink() && filled($booking->meeting_link)))
+                    <p class="mt-3 text-slate-700">{{ $slot->consultation_type->customerInstructions() }}</p>
+                @endif
+
+                @if ($booking->status === \App\Enums\ConsultationBookingStatus::PendingPayment && ! $booking->needsRebooking())
+                    <p class="mt-3 text-sm text-slate-600">
+                        @if ($booking->isOccupyingSlot())
+                            We're holding this time for you until {{ $booking->hold_expires_at->timezone(\App\Models\ConsultationSlot::timezone())->format('g:ia') }}.
+                        @else
+                            Your hold on this time has ended. "Pay now" will check it's still free; if not, please <a href="{{ route('book-consultation') }}" class="font-semibold text-brand-700 underline">book another time</a>.
+                        @endif
+                    </p>
+                @endif
+            </section>
+        @endif
 
         @if ($pins->isNotEmpty())
             {{-- The customer's own PINs: shown in full, not audited (LogPinAccess only records staff/admin viewers). --}}

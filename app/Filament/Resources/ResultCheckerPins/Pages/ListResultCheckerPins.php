@@ -4,12 +4,10 @@ namespace App\Filament\Resources\ResultCheckerPins\Pages;
 
 use App\Actions\Pins\ImportPinBatch;
 use App\Enums\FulfilmentType;
-use App\Enums\OrderStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Exceptions\PinImportRejected;
 use App\Filament\Resources\ResultCheckerPins\ResultCheckerPinResource;
 use App\Filament\Widgets\PinStockOverview;
-use App\Models\Order;
 use App\Models\Service;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
@@ -61,7 +59,7 @@ class ListResultCheckerPins extends ListRecords
             ->label('Upload PINs')
             ->icon(Heroicon::OutlinedArrowUpTray)
             ->authorize('create')
-            ->modalDescription('One PIN per line, or "PIN,serial number" per line. A header row starting with "PIN" is skipped. Nothing is imported if any line is invalid or already in stock.')
+            ->modalDescription('One PIN per line, or "PIN,serial number" per line. A header row starting with "PIN" is skipped. Nothing is imported if any line is invalid or already in stock. Paid orders waiting for PINs are served from the new stock straight away, oldest first.')
             ->schema([
                 Select::make('service_id')
                     ->label('Result checker')
@@ -116,19 +114,34 @@ class ListResultCheckerPins extends ListRecords
                     return;
                 }
 
-                $waiting_orders = Order::query()
-                    ->where('service_id', $service->id)
-                    ->whereIn('status', [OrderStatus::Paid->value, OrderStatus::InProgress->value])
-                    ->count();
-
                 Notification::make()
                     ->success()
                     ->title(trans_choice(':count PIN added to :service.|:count PINs added to :service.', $result['imported'], ['service' => $service->name]))
-                    ->body($waiting_orders > 0
-                        ? trans_choice(':count paid order is waiting for PINs: open it and use "Deliver PIN manually".|:count paid orders are waiting for PINs: open each and use "Deliver PIN manually".', $waiting_orders)
-                        : null)
+                    ->body(self::waiting_orders_summary($result))
                     ->send();
             });
+    }
+
+    /**
+     * What the upload did for paid orders that were waiting for PINs.
+     *
+     * @param  array{pins_delivered: int, orders_completed: int, orders_still_waiting: int}  $result
+     * @return string|null
+     */
+    private static function waiting_orders_summary(array $result): ?string
+    {
+        $lines = [];
+
+        if ($result['pins_delivered'] > 0) {
+            $lines[] = trans_choice(':count PIN was sent to customers who were waiting|:count PINs were sent to customers who were waiting', $result['pins_delivered'])
+                .' ('.trans_choice(':count order completed|:count orders completed', $result['orders_completed']).').';
+        }
+
+        if ($result['orders_still_waiting'] > 0) {
+            $lines[] = trans_choice(':count paid order is still waiting for PINs.|:count paid orders are still waiting for PINs.', $result['orders_still_waiting']);
+        }
+
+        return $lines === [] ? null : implode(' ', $lines);
     }
 
     /**

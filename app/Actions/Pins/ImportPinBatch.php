@@ -29,9 +29,21 @@ use Illuminate\Support\Str;
  *    non-deterministically); the unique index on pin_hash is the final guard
  *    if two admins upload overlapping batches at the same moment.
  *  - Problem messages never repeat PIN values.
+ *  - Once the batch is in stock, paid orders left short of PINs are served
+ *    from it straight away, oldest first (FulfilWaitingPinOrders), and the
+ *    stock level is re-checked (which re-arms the low-stock alert).
  */
 class ImportPinBatch
 {
+    /**
+     * @param  FulfilWaitingPinOrders  $fulfil_waiting_pin_orders
+     * @param  CheckPinStockLevel  $check_pin_stock_level
+     */
+    public function __construct(
+        private readonly FulfilWaitingPinOrders $fulfil_waiting_pin_orders,
+        private readonly CheckPinStockLevel $check_pin_stock_level,
+    ) {}
+
     /**
      * Largest batch accepted in one upload.
      *
@@ -57,7 +69,7 @@ class ImportPinBatch
      * @param  Service  $service  A result checker service.
      * @param  string  $input  Pasted lines or CSV file contents.
      * @param  User  $admin  The uploader.
-     * @return array{imported: int, batch_id: string}
+     * @return array{imported: int, batch_id: string, orders_completed: int, pins_delivered: int, orders_still_waiting: int}
      *
      * @throws BusinessRuleException If the uploader or service is not allowed.
      * @throws PinImportRejected If any line has a problem (nothing is imported).
@@ -112,7 +124,10 @@ class ImportPinBatch
             throw new PinImportRejected('Nothing was imported: some of these PINs were added to stock while you were uploading. Upload the batch again to see which lines.');
         }
 
-        return ['imported' => count($rows), 'batch_id' => $batch_id];
+        $waiting = $this->fulfil_waiting_pin_orders->handle($service);
+        $this->check_pin_stock_level->handle($service);
+
+        return ['imported' => count($rows), 'batch_id' => $batch_id] + $waiting;
     }
 
     /**

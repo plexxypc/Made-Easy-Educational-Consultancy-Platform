@@ -12,7 +12,9 @@ use Illuminate\Database\Seeder;
  *
  * Pricing rules (all amounts in KOBO):
  * - Prices given in the document are used as-is (WAEC Result Checker ₦6,500,
- *   Admission Consultation ₦20,000). These services are active.
+ *   Admission Consultation ₦20,000). These services are active, except
+ *   Admission Consultation, which an admin activates once consultation
+ *   slots have been added and booking has been tested.
  * - Manual/instant services WITHOUT a documented price get PLACEHOLDER_PRICE and
  *   (Service::PLACEHOLDER_PRICE) are seeded INACTIVE, so nothing can be bought at a made-up price. An admin
  *   sets the real price and activates them.
@@ -48,7 +50,7 @@ class ServiceCatalogueSeeder extends Seeder
                     $price = 0;
                     $is_active = true;
                 } else {
-                    $is_active = $price !== null;
+                    $is_active = $service_data['active'] ?? $price !== null;
                     $price ??= Service::PLACEHOLDER_PRICE;
                 }
 
@@ -122,9 +124,9 @@ class ServiceCatalogueSeeder extends Seeder
                     ['name' => 'University Admission Assistance', 'slug' => 'university-admission-assistance', 'type' => $manual],
                     ['name' => 'Polytechnic Admission Assistance', 'slug' => 'polytechnic-admission-assistance', 'type' => $manual],
                     ['name' => 'College of Education Admission Assistance', 'slug' => 'college-of-education-admission-assistance', 'type' => $manual],
-                    // Section 6 (consultation booking). Booking details (date, time, mode)
-                    // belong to the consultations table in a later prompt.
-                    ['name' => 'Admission Consultation', 'slug' => 'admission-consultation', 'type' => $manual, 'price' => 2_000_000],
+                    // Section 6 (consultation booking): booked on /book-consultation.
+                    // Seeded inactive: an admin activates it once slots are set up.
+                    ['name' => 'Admission Consultation', 'slug' => 'admission-consultation', 'type' => FulfilmentType::Consultation, 'price' => 2_000_000, 'active' => false],
                 ],
             ],
             [

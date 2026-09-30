@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FulfilmentType;
+use App\Enums\PinStockLevel;
 use App\Support\Money;
 use Database\Factories\ServiceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * A purchasable service.
@@ -26,6 +28,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property FulfilmentType $fulfilment_type
  * @property array<int, array{key: string, label: string, type: string, required: bool, min?: int, max?: int, options?: array<int, string>}>|null $customer_fields
  *                                                                                                                                                                 Shape documented in the create_services_table migration.
+ * @property int|null $pin_low_stock_threshold Result checkers: "low" at or below this; null = the global default.
+ * @property PinStockLevel|null $pin_stock_level Last level seen by CheckPinStockLevel (not mass-assignable).
+ * @property Carbon|null $pin_stock_level_changed_at
  */
 #[Fillable([
     'service_category_id',
@@ -36,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'is_active',
     'fulfilment_type',
     'customer_fields',
+    'pin_low_stock_threshold',
 ])]
 class Service extends Model
 {
@@ -88,13 +94,14 @@ class Service extends Model
      * Whether customers can submit the generic "Request this service" form.
      *
      * Instant services (result checker PINs) are sold through the result
-     * checker store instead, so they never take a generic request.
+     * checker store, and consultations are booked on /book-consultation, so
+     * neither takes a generic request.
      *
      * @return bool
      */
     public function acceptsRequests(): bool
     {
-        return $this->is_active && $this->fulfilment_type !== FulfilmentType::Instant;
+        return $this->is_active && ! in_array($this->fulfilment_type, [FulfilmentType::Instant, FulfilmentType::Consultation], true);
     }
 
     /**
@@ -159,6 +166,9 @@ class Service extends Model
             'is_active' => 'boolean',
             'fulfilment_type' => FulfilmentType::class,
             'customer_fields' => 'array',
+            'pin_low_stock_threshold' => 'integer',
+            'pin_stock_level' => PinStockLevel::class,
+            'pin_stock_level_changed_at' => 'datetime',
         ];
     }
 
@@ -192,6 +202,47 @@ class Service extends Model
     public function isResultChecker(): bool
     {
         return $this->fulfilment_type === FulfilmentType::Instant;
+    }
+
+    /**
+     * Available-PIN count at or below which this result checker is "low":
+     * its own value if set, otherwise config('madeeasy.pins.low_stock_threshold').
+     *
+     * @return int
+     */
+    public function lowStockThreshold(): int
+    {
+        return $this->pin_low_stock_threshold ?? (int) config('madeeasy.pins.low_stock_threshold');
+    }
+
+    /**
+     * Whether this service is a consultation booked on /book-consultation.
+     *
+     * @return bool
+     */
+    public function isConsultation(): bool
+    {
+        return $this->fulfilment_type === FulfilmentType::Consultation;
+    }
+
+    /**
+     * The consultation service sold on /book-consultation, or null if none is
+     * on sale (e.g. "Admission Consultation" not yet activated in the admin).
+     *
+     * Assumption: one consultation service at a time. Slots are shared staff
+     * time, not tied to a service; if several consultation services are
+     * active, the oldest is booked.
+     *
+     * @return self|null
+     */
+    public static function bookableConsultation(): ?self
+    {
+        return self::query()
+            ->where('is_active', true)
+            ->where('fulfilment_type', FulfilmentType::Consultation->value)
+            ->where('price', '>', 0)
+            ->orderBy('id')
+            ->first();
     }
 
     /**

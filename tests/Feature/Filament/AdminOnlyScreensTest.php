@@ -5,6 +5,7 @@ namespace Tests\Feature\Filament;
 use App\Actions\Users\ChangeUserRole;
 use App\Enums\UserRole;
 use App\Exceptions\BusinessRuleException;
+use App\Filament\Resources\ConsultationSlots\ConsultationSlotResource;
 use App\Filament\Resources\DocumentAccessLogs\DocumentAccessLogResource;
 use App\Filament\Resources\DocumentAccessLogs\Pages\ListDocumentAccessLogs;
 use App\Filament\Resources\ServiceCategories\ServiceCategoryResource;
@@ -37,6 +38,7 @@ class AdminOnlyScreensTest extends TestCase
             'users & roles' => [UserResource::class],
             'services' => [ServiceResource::class],
             'service categories' => [ServiceCategoryResource::class],
+            'consultation availability' => [ConsultationSlotResource::class],
         ];
     }
 

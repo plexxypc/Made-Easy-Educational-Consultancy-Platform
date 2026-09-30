@@ -17,9 +17,10 @@ use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
- * Create an order: from the public "Request this service" form, or from
- * "Buy Result Checker" (which then goes straight to payment). One code path
- * for both, so every order is created, emailed and tracked the same way.
+ * Create an order: from the public "Request this service" form, from
+ * "Buy Result Checker", or from /book-consultation (both of which then go
+ * straight to payment). One code path, so every order is created and
+ * tracked the same way.
  *
  * Business rules:
  *  - The order starts in pending_payment. Nothing here takes or implies payment.
@@ -31,6 +32,10 @@ use Throwable;
  *    customer submits (staff/admin testing the site don't become owners).
  *  - Uploaded files become order_documents via StoreOrderDocument. If anything
  *    fails, the order is rolled back and files already written are deleted.
+ *  - The "request received" email goes to generic requests only. Result
+ *    checker and consultation customers go straight to Paystack, and their
+ *    receipt plus PIN / booking email already confirm the order; a third
+ *    email saying "not paid yet" only confused them.
  */
 class CreateServiceRequest
 {
@@ -54,7 +59,7 @@ class CreateServiceRequest
      */
     public function handle(Service $service, array $contact, array $answers, array $files = [], ?User $submitted_by = null, int $quantity = 1): Order
     {
-        if (! ($service->acceptsRequests() || self::is_purchasable_result_checker($service))) {
+        if (! ($service->acceptsRequests() || self::is_purchasable_result_checker($service) || self::is_bookable_consultation($service))) {
             throw new BusinessRuleException('This service is not currently available to request.');
         }
 
@@ -101,7 +106,9 @@ class CreateServiceRequest
             throw $exception;
         }
 
-        Mail::to($order->guest_email)->queue(new ServiceRequestReceivedMail($order));
+        if (! $service->isResultChecker() && ! $service->isConsultation()) {
+            Mail::to($order->guest_email)->queue(new ServiceRequestReceivedMail($order));
+        }
 
         return $order;
     }
@@ -115,5 +122,17 @@ class CreateServiceRequest
     private static function is_purchasable_result_checker(Service $service): bool
     {
         return $service->is_active && $service->isResultChecker() && $service->price > 0;
+    }
+
+    /**
+     * Active, priced consultation (booked through /book-consultation, which
+     * claims the slot in the same transaction; see BookConsultation).
+     *
+     * @param  Service  $service
+     * @return bool
+     */
+    private static function is_bookable_consultation(Service $service): bool
+    {
+        return $service->is_active && $service->isConsultation() && $service->price > 0;
     }
 }

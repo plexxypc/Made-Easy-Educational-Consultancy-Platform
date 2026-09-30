@@ -5,6 +5,7 @@ namespace App\Actions\Pins;
 use App\Enums\PinStatus;
 use App\Models\Order;
 use App\Models\ResultCheckerPin;
+use App\Support\RowLock;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -25,14 +26,21 @@ use RuntimeException;
  *    decide how to flag it (AllocateResultCheckerPins notifies staff).
  *  - Anything allocated is delivered straight after commit (DeliverAllocatedPins),
  *    which completes the order once every unit has a PIN.
+ *  - The service's stock level is then re-checked (CheckPinStockLevel), which
+ *    alerts staff if this allocation took it to "low" or "out".
+ *
+ * Used by the OrderPaid listener, by "Deliver PIN manually", and by
+ * FulfilWaitingPinOrders after a stock upload: one locking implementation.
  */
 class AllocatePinsToOrder
 {
     /**
      * @param  DeliverAllocatedPins  $deliver_allocated_pins
+     * @param  CheckPinStockLevel  $check_pin_stock_level
      */
     public function __construct(
         private readonly DeliverAllocatedPins $deliver_allocated_pins,
+        private readonly CheckPinStockLevel $check_pin_stock_level,
     ) {}
 
     /**
@@ -59,7 +67,7 @@ class AllocatePinsToOrder
                 ->where('service_id', $locked_order->service_id)
                 ->orderBy('id')
                 ->limit($needed)
-                ->lock(self::row_lock())
+                ->lock(RowLock::skip_locked())
                 ->pluck('id')
                 ->all();
 
@@ -84,18 +92,10 @@ class AllocatePinsToOrder
 
         $this->deliver_allocated_pins->handle($order);
 
-        return ['allocated' => $allocated, 'undelivered' => $undelivered];
-    }
+        if ($allocated > 0 || $undelivered > 0) {
+            $this->check_pin_stock_level->handle($order->service()->firstOrFail());
+        }
 
-    /**
-     * Row lock for the stock query. SKIP LOCKED where the database supports it
-     * (PostgreSQL in production); plain FOR UPDATE otherwise (SQLite, used by
-     * the test suite, has no row locks and serialises writers instead).
-     *
-     * @return string|bool
-     */
-    private static function row_lock(): string|bool
-    {
-        return in_array(DB::getDriverName(), ['pgsql', 'mysql', 'mariadb'], true) ? 'for update skip locked' : true;
+        return ['allocated' => $allocated, 'undelivered' => $undelivered];
     }
 }

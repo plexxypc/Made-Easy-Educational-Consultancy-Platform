@@ -52,10 +52,19 @@ class ServiceForm
                             ->required()
                             ->default(FulfilmentType::Manual->value)
                             ->live()
-                            ->helperText('Instant: delivered automatically after payment. Manual: fixed price, handled by staff. Quote: staff set the price per order.'),
+                            ->helperText('Instant: delivered automatically after payment. Manual: fixed price, handled by staff. Quote: staff set the price per order. Consultation booking: customers pick a slot on /book-consultation and pay.'),
                         SlugField::name_input(),
                         SlugField::slug_input(),
                         self::price_input(),
+                        TextInput::make('pin_low_stock_threshold')
+                            ->label('Low PIN stock at')
+                            ->integer()
+                            ->minValue(0)
+                            ->maxValue(100000)
+                            ->suffix('PINs or fewer')
+                            ->placeholder(fn (): string => (string) config('madeeasy.pins.low_stock_threshold'))
+                            ->helperText(fn (): string => 'Staff are alerted (bell + email) when available PINs drop to this level, and again at zero. Leave empty to use the default ('.config('madeeasy.pins.low_stock_threshold').').')
+                            ->visible(fn (Get $get): bool => self::fulfilment_type($get) === FulfilmentType::Instant),
                         Toggle::make('is_active')
                             ->label('Active (customers can order it)')
                             ->default(false)
@@ -179,13 +188,20 @@ class ServiceForm
      */
     private static function is_quote(Get $get): bool
     {
+        return self::fulfilment_type($get) === FulfilmentType::Quote;
+    }
+
+    /**
+     * The form's selected fulfilment type.
+     *
+     * @param  Get  $get
+     * @return FulfilmentType|null
+     */
+    private static function fulfilment_type(Get $get): ?FulfilmentType
+    {
         $fulfilment_type = $get('fulfilment_type');
 
-        if (! $fulfilment_type instanceof FulfilmentType) {
-            $fulfilment_type = FulfilmentType::tryFrom((string) $fulfilment_type);
-        }
-
-        return $fulfilment_type === FulfilmentType::Quote;
+        return $fulfilment_type instanceof FulfilmentType ? $fulfilment_type : FulfilmentType::tryFrom((string) $fulfilment_type);
     }
 
     /**

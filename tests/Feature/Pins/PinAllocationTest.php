@@ -7,6 +7,7 @@ use App\Enums\FulfilmentType;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PinStatus;
+use App\Enums\PinStockLevel;
 use App\Events\OrderPaid;
 use App\Exceptions\BusinessRuleException;
 use App\Filament\Resources\DocumentAccessLogs\Pages\ListDocumentAccessLogs;
@@ -14,6 +15,7 @@ use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Filament\Resources\Orders\RelationManagers\PinsRelationManager;
 use App\Listeners\AllocateResultCheckerPins;
 use App\Mail\PaymentReceiptMail;
+use App\Mail\ResultCheckerDelayedMail;
 use App\Mail\ResultCheckerPinsMail;
 use App\Models\DocumentAccessLog;
 use App\Models\Order;
@@ -21,6 +23,7 @@ use App\Models\ResultCheckerPin;
 use App\Models\Service;
 use App\Models\User;
 use App\Notifications\PinsNeedManualFulfilment;
+use App\Notifications\PinStockRunningLow;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -110,7 +113,9 @@ class PinAllocationTest extends TestCase
 
             return $mail->hasTo('ada@example.com') && $mail->still_owed === 0;
         });
-        Notification::assertNothingSent();
+        Mail::assertNotQueued(ResultCheckerDelayedMail::class);
+        Notification::assertNotSentTo($this->staff_user, PinsNeedManualFulfilment::class);
+        Notification::assertSentTo($this->staff_user, PinStockRunningLow::class, fn (PinStockRunningLow $notification): bool => $notification->level === PinStockLevel::Out);
     }
 
     /**
@@ -136,6 +141,8 @@ class PinAllocationTest extends TestCase
         $this->assertFalse($order->canBePaid());
 
         Mail::assertNotQueued(ResultCheckerPinsMail::class);
+        Mail::assertQueued(ResultCheckerDelayedMail::class, fn (ResultCheckerDelayedMail $mail): bool => $mail->hasTo('ada@example.com'));
+        Mail::assertQueued(ResultCheckerDelayedMail::class, 1);
         Notification::assertSentTo($this->staff_user, PinsNeedManualFulfilment::class, fn (PinsNeedManualFulfilment $notification): bool => $notification->undelivered === 1
             && $notification->reason === PinsNeedManualFulfilment::OUT_OF_STOCK
             && $notification->order->is($order));
@@ -214,7 +221,8 @@ class PinAllocationTest extends TestCase
         $this->assertSame(2, $order->pins()->count());
         $this->assertSame($top_up[0]->id, $order->pins()->max('id'));
         $this->assertSame(2, ResultCheckerPin::query()->available()->count());
-        Mail::assertQueuedCount(3); // receipt, first PIN, second PIN
+        Mail::assertQueuedCount(4); // receipt, "delayed", first PIN, second PIN
+        Mail::assertQueued(ResultCheckerDelayedMail::class, 1);
     }
 
     /**

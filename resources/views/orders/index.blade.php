@@ -23,6 +23,13 @@
                             </span>
                             <x-public.status-badge :status="$order->status" />
                         </a>
+                        @if ($order->consultationBooking)
+                            <div class="border-t border-slate-100 px-5 py-3 text-sm text-slate-700">
+                                <span class="font-semibold text-slate-900">{{ $order->consultationBooking->slot->label() }}</span>
+                                · {{ $order->consultationBooking->slot->consultation_type->getLabel() }}
+                                · {{ $order->consultationBooking->statusLabel() }}
+                            </div>
+                        @endif
                         @if ($order->pins->isNotEmpty())
                             <div class="border-t border-slate-100 px-5 py-3">
                                 <p class="text-sm font-semibold text-slate-600">Your {{ $order->pins->count() > 1 ? 'PINs' : 'PIN' }}</p>

@@ -5,10 +5,13 @@ namespace App\Listeners;
 use App\Actions\Pins\AllocatePinsToOrder;
 use App\Enums\UserRole;
 use App\Events\OrderPaid;
+use App\Mail\ResultCheckerDelayedMail;
+use App\Models\Order;
 use App\Models\User;
 use App\Notifications\PinsNeedManualFulfilment;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
 
@@ -21,8 +24,10 @@ use Throwable;
  *
  * Business rule (PIN stock fallback): running out of stock never blocks or
  * reverses the payment. The order stays paid, whatever stock exists is
- * delivered, and staff are notified to deliver the rest manually. The same
- * notification goes out if allocation keeps failing for another reason.
+ * delivered, staff are notified, and the customer is emailed that the rest
+ * is delayed. The same happens if allocation keeps failing for another
+ * reason. Waiting orders are then served by the next stock upload
+ * (FulfilWaitingPinOrders) or by staff ("Deliver PIN manually").
  */
 class AllocateResultCheckerPins implements ShouldQueue
 {
@@ -74,7 +79,10 @@ class AllocateResultCheckerPins implements ShouldQueue
                 'undelivered' => $result['undelivered'],
             ]);
 
-            self::notify_staff(new PinsNeedManualFulfilment($event->order->refresh(), $result['undelivered'], PinsNeedManualFulfilment::OUT_OF_STOCK));
+            $order = $event->order->refresh();
+
+            self::notify_staff(new PinsNeedManualFulfilment($order, $result['undelivered'], PinsNeedManualFulfilment::OUT_OF_STOCK));
+            self::tell_customer_about_delay($order, $result['undelivered']);
         }
     }
 
@@ -96,6 +104,24 @@ class AllocateResultCheckerPins implements ShouldQueue
         $order = $event->order->refresh();
 
         self::notify_staff(new PinsNeedManualFulfilment($order, max(1, $order->undeliveredPinCount()), PinsNeedManualFulfilment::ALLOCATION_FAILED));
+
+        if ($order->undeliveredPinCount() > 0) {
+            self::tell_customer_about_delay($order, $order->undeliveredPinCount());
+        }
+    }
+
+    /**
+     * "Your result checker is delayed", sent when the shortfall is flagged.
+     *
+     * @param  Order  $order
+     * @param  int  $delayed
+     * @return void
+     */
+    private static function tell_customer_about_delay(Order $order, int $delayed): void
+    {
+        if ($order->customer_email !== null) {
+            Mail::to($order->customer_email)->queue(new ResultCheckerDelayedMail($order, $delayed));
+        }
     }
 
     /**

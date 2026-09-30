@@ -99,6 +99,7 @@ class OrderTrackingController extends Controller
 
         return response()->view('orders.show', [
             'order' => $order,
+            'booking' => $order->isConsultation() ? $order->consultationBooking()->with('slot')->first() : null,
             'pins' => $pins,
             'undelivered_pins' => $order->undeliveredPinCount(),
             'answers' => $order->labelledFieldAnswers(),
@@ -156,7 +157,7 @@ class OrderTrackingController extends Controller
             'orders' => Order::query()
                 ->visibleTo($user)
                 ->whereBelongsTo($user)
-                ->with(['service', 'pins' => fn ($query) => $query->where('status', PinStatus::Revealed->value)])
+                ->with(['service', 'consultationBooking.slot', 'pins' => fn ($query) => $query->where('status', PinStatus::Revealed->value)])
                 ->latest()
                 ->latest('id')
                 ->paginate(15),

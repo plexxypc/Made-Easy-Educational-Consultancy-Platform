@@ -17,11 +17,21 @@
             'text-xl text-slate-900' => ! $is_quote,
             'text-base text-brand-800' => $is_quote,
         ])>{{ $service->priceLabel() }}</p>
-        <a
-            href="{{ route('services.show', ['category' => $category, 'service' => $service]) }}"
-            class="inline-flex min-h-[48px] items-center rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800"
-        >
-            View &amp; request<span class="sr-only">: {{ $service->name }}</span>
-        </a>
+        @if ($service->isConsultation())
+            {{-- Consultations are booked on /book-consultation, not through the request form. --}}
+            <a
+                href="{{ route('book-consultation') }}"
+                class="inline-flex min-h-[48px] items-center rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+            >
+                Book a time<span class="sr-only">: {{ $service->name }}</span>
+            </a>
+        @else
+            <a
+                href="{{ route('services.show', ['category' => $category, 'service' => $service]) }}"
+                class="inline-flex min-h-[48px] items-center rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800"
+            >
+                View &amp; request<span class="sr-only">: {{ $service->name }}</span>
+            </a>
+        @endif
     </div>
 </li>

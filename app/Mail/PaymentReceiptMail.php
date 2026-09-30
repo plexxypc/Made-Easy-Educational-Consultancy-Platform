@@ -56,6 +56,7 @@ class PaymentReceiptMail extends Mailable implements ShouldQueue
                 'track_url' => route('orders.track.show', $order),
                 'receipt_url' => route('orders.receipt', $order),
                 'is_result_checker' => $order->isResultChecker(),
+                'is_consultation' => $order->isConsultation(),
                 'pin_noun' => $order->quantity > 1 ? 'PINs' : 'PIN',
             ],
         );

@@ -28,6 +28,8 @@ View or download receipt
 
 @if ($is_result_checker)
 Your result checker {{ $pin_noun }} will arrive in a separate email and will also be shown on [your request page]({{ $track_url }}).
+@elseif ($is_consultation)
+Your booking confirmation, with the date, time and type of your consultation, follows in a separate email. It is also shown on [your booking page]({{ $track_url }}).
 @else
 We'll now start work on your request. You can follow its progress on [your request page]({{ $track_url }}).
 @endif

@@ -100,7 +100,8 @@ class ResultCheckerStoreTest extends TestCase
         $this->assertSame(1_950_000, Payment::query()->sole()->amount);
 
         Http::assertSent(fn (HttpRequest $request): bool => $request['amount'] === 1_950_000 && $request['email'] === 'ada@example.com');
-        Mail::assertQueued(ServiceRequestReceivedMail::class, fn (ServiceRequestReceivedMail $mail): bool => $mail->hasTo('ada@example.com'));
+        // Instant fulfilment: the receipt + PIN email confirm receipt, so no "request received" email.
+        Mail::assertNotQueued(ServiceRequestReceivedMail::class);
 
         // The guest can come back from Paystack without looking the order up.
         $this->get(route('orders.track.show', $order))->assertOk()->assertSee('WAEC Result Checker × 3');

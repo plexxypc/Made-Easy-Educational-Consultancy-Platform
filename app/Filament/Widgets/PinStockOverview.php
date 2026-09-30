@@ -3,7 +3,6 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\FulfilmentType;
-use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Service;
 use Filament\Support\Icons\Heroicon;
@@ -16,9 +15,10 @@ use Illuminate\Database\Eloquent\Builder;
  * the number of paid orders still waiting for PINs. Counts only; no PIN
  * values. Shown on the dashboard and above the PIN stock list.
  *
- * Business rule: a service is "low" at or below
- * config('madeeasy.pins.low_stock_threshold') available PINs (one threshold
- * for all services). Services that are inactive and have no stock are left out.
+ * Business rule: a service is "low" at or below Service::lowStockThreshold()
+ * available PINs (its own value, else the configured default). Services that
+ * are inactive and have no stock are left out. Staff are also alerted by
+ * CheckPinStockLevel when a service crosses that level; this is the display.
  */
 class PinStockOverview extends StatsOverviewWidget
 {
@@ -43,8 +43,6 @@ class PinStockOverview extends StatsOverviewWidget
      */
     protected function getStats(): array
     {
-        $threshold = (int) config('madeeasy.pins.low_stock_threshold');
-
         $services = Service::query()
             ->where('fulfilment_type', FulfilmentType::Instant->value)
             ->withCount(['pins as available_pins_count' => fn (Builder $query) => $query->available()])
@@ -53,8 +51,9 @@ class PinStockOverview extends StatsOverviewWidget
             ->get()
             ->filter(fn (Service $service): bool => $service->is_active || $service->available_pins_count > 0);
 
-        $stats = $services->map(function (Service $service) use ($threshold): Stat {
+        $stats = $services->map(function (Service $service): Stat {
             $available = (int) $service->available_pins_count;
+            $threshold = $service->lowStockThreshold();
             $is_low = $available <= $threshold;
 
             return Stat::make($service->name, number_format($available))
@@ -67,13 +66,10 @@ class PinStockOverview extends StatsOverviewWidget
                 ->color($available === 0 ? 'danger' : ($is_low ? 'warning' : 'success'));
         })->values()->all();
 
-        $waiting = Order::query()
-            ->whereHas('service', fn (Builder $query) => $query->where('fulfilment_type', FulfilmentType::Instant->value))
-            ->whereIn('status', [OrderStatus::Paid->value, OrderStatus::InProgress->value])
-            ->count();
+        $waiting = Order::query()->waitingForPins()->count();
 
         $stats[] = Stat::make('Paid orders waiting for PINs', $waiting)
-            ->description($waiting > 0 ? 'Open each order and use "Deliver PIN manually"' : 'None')
+            ->description($waiting > 0 ? 'Served automatically on the next upload, or use "Deliver PIN manually"' : 'None')
             ->icon(Heroicon::OutlinedKey)
             ->color($waiting > 0 ? 'danger' : 'gray');
 

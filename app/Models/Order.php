@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
@@ -200,6 +201,16 @@ class Order extends Model
     }
 
     /**
+     * Whether this is a consultation booking order (see consultationBooking()).
+     *
+     * @return bool
+     */
+    public function isConsultation(): bool
+    {
+        return $this->service?->fulfilment_type === FulfilmentType::Consultation;
+    }
+
+    /**
      * Whether PINs may be allocated to this order now: a paid (or in-progress)
      * result checker order that hasn't been deleted.
      *
@@ -231,6 +242,24 @@ class Order extends Model
     }
 
     /**
+     * Paid result checker orders still owed PINs (the query form of
+     * undeliveredPinCount() > 0), e.g. to serve them after a stock upload.
+     *
+     * @param  Builder<Order>  $query
+     * @return void
+     */
+    #[Scope]
+    protected function waitingForPins(Builder $query): void
+    {
+        $query->whereIn('status', [OrderStatus::Paid->value, OrderStatus::InProgress->value])
+            ->whereHas('service', fn (Builder $service_query) => $service_query->where('fulfilment_type', FulfilmentType::Instant->value))
+            ->where('quantity', '>', fn ($pin_count_query) => $pin_count_query
+                ->selectRaw('count(*)')
+                ->from('result_checker_pins')
+                ->whereColumn('result_checker_pins.order_id', 'orders.id'));
+    }
+
+    /**
      * Whether a quote order still has no staff-determined total.
      *
      * @return bool
@@ -251,6 +280,9 @@ class Order extends Model
      *    or straight away if its total is ₦0. Needs action and cancel stay available.
      *  - A result checker order can't be marked completed while PINs are still
      *    owed; it completes itself once every PIN has been delivered.
+     *  - A consultation order is completed or cancelled only through its
+     *    booking (Consultations → Bookings: completed, no-show, cancel), so the
+     *    order and booking never disagree and the slot is freed correctly.
      *
      * @param  OrderStatus  $next_status
      * @return bool
@@ -258,6 +290,10 @@ class Order extends Model
     public function canTransitionTo(OrderStatus $next_status): bool
     {
         if (! $this->status->canTransitionTo($next_status)) {
+            return false;
+        }
+
+        if ($this->isConsultation() && in_array($next_status, [OrderStatus::Completed, OrderStatus::Cancelled], true)) {
             return false;
         }
 
@@ -482,6 +518,16 @@ class Order extends Model
     public function pins(): HasMany
     {
         return $this->hasMany(ResultCheckerPin::class)->orderBy('allocated_at')->orderBy('id');
+    }
+
+    /**
+     * The consultation booking made with this order (consultation orders only).
+     *
+     * @return HasOne<ConsultationBooking, $this>
+     */
+    public function consultationBooking(): HasOne
+    {
+        return $this->hasOne(ConsultationBooking::class);
     }
 
     /**

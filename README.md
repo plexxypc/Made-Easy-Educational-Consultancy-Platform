@@ -184,6 +184,7 @@ They use the `<x-public-layout>` component. The nav comes from
 | `/services/{category}` | One category (Admission = `admission-services`, Documents = `document-services`) |
 | `/services/{category}/{service}` | Service detail and the **Request this service** form |
 | `/result-checker` | **Buy Result Checker**: pick a checker and quantity, then **Buy now** straight to Paystack |
+| `/book-consultation` | **Book a Consultation**: pick an open time, give contact details, pay through Paystack |
 | `/updates` | Placeholder until its later prompt |
 | `/about`, `/contact` | About (placeholder copy) and Contact |
 | `/track` | **Track your request**: reference plus the email or phone used |
@@ -203,12 +204,15 @@ set in the admin under Services, then "Information required from the customer".
   They are stored on the private disk under `order-documents/{order_id}/`, and the
   MIME type is re-checked from the file contents. Allowed types are PDF, JPG and
   PNG, up to `UPLOAD_MAX_KILOBYTES` each.
-- A queued `ServiceRequestReceivedMail` gives the customer their reference, a
+- A queued `ServiceRequestReceivedMail` gives the customer their reference (not
+  sent for result checkers or consultations, whose receipt and PIN or booking
+  emails already confirm the order). The reference is a
   random code such as `ME-7K2QXD` (`Order::generateReference()`, Crockford
   base32, unique). Orders created before this change keep their old numeric
   reference (shown as `#12`). Submissions are rate-limited to 5 per minute per IP.
-- Instant services (result checkers) and inactive services can't be requested
-  through this form; result checkers are bought on `/result-checker`.
+- Instant services (result checkers), consultation services and inactive
+  services can't be requested through this form; result checkers are bought on
+  `/result-checker` and consultations booked on `/book-consultation`.
 
 **Order tracking.** `App\Actions\Orders\FindTrackableOrder` matches the
 reference against the guest or account email (any case), or the phone number
@@ -291,10 +295,45 @@ priced above ₦0 (`Service::resultCheckersForSale()`).
   `EMAIL_STAFF_ON_PIN_SHORTFALL=true`), the order shows a red "PINs still to
   deliver" callout, and the order can't be marked completed until it is fully
   delivered. The fix is **Deliver PIN manually** on the order: allocate from
-  stock after a top-up, or type in a one-off PIN.
+  stock after a top-up, or type in a one-off PIN. The customer is emailed
+  straight away that their PIN is delayed (`ResultCheckerDelayedMail`).
+- **Top-ups fulfil waiting orders.** After an upload, `FulfilWaitingPinOrders`
+  runs `AllocatePinsToOrder` (the same locking) for every paid order still owed
+  PINs, oldest first, stopping at the first it can't complete.
+- **Low-stock alerts.** Each result checker has an optional low-stock threshold
+  (Services → edit), falling back to `PIN_LOW_STOCK_THRESHOLD`.
+  `CheckPinStockLevel` runs after allocations, uploads and deletions. It sends
+  staff and admins `PinStockRunningLow` (bell and email) once when stock falls
+  to the threshold and once when it hits zero. A restock resets it silently.
 - **Customers** see their PINs on the order tracking page and in My Requests
   (served with `Cache-Control: no-store`). They see "N PINs on the way" while
   any are owed.
+
+**Consultations.** The bookable consultation is the oldest active service with
+fulfilment type **Consultation** and a price above ₦0
+(`Service::bookableConsultation()`). Admins add times under Consultations →
+Availability (`consultation_slots`: date, start time, length, type, places).
+Times are in `CONSULTATION_TIMEZONE`.
+
+- **Booking.** `/book-consultation` lists open times with a free place, at
+  least `CONSULTATION_MIN_NOTICE_MINUTES` ahead. `BookConsultation` claims the
+  slot (`ReserveConsultationSlot`: `SELECT … FOR UPDATE SKIP LOCKED` on the slot
+  row, then a capacity check). It then creates the order through
+  `CreateServiceRequest` and a `pending_payment` booking that holds the place
+  for `CONSULTATION_HOLD_MINUTES`, and hands over to the normal `InitiatePayment`.
+  **Pay now** re-checks the slot and renews the hold.
+- **Confirmation.** The queued `OrderPaid` listener
+  `ConfirmConsultationBookingOnPayment` runs `ConfirmConsultationBooking`; the
+  webhook has no consultation logic. If the slot still has room, the booking is
+  `confirmed` and the customer is emailed the date, time and type. If the hold
+  lapsed and someone else took the place, the money is kept, the booking shows
+  "Paid – needs a new time", and staff get `ConsultationNeedsRebooking`.
+- **Meeting links** are never generated. For Google Meet and online
+  consultations, the email and order page show "To be added by our team" until
+  staff use **Add meeting link** on the booking.
+- **Cancellations.** A cancelled booking frees its place; completed and no-show
+  bookings keep it. Cancelling a slot cancels every booking on it and emails
+  those customers. Refunds are done by hand in Paystack.
 
 **Contact details** (Contact page, footer, emails) come from the `CONTACT_*`
 variables in `.env`. After changing them in production, run
@@ -314,12 +353,15 @@ With `LOG_CHANNEL=stderr` and `MAIL_MAILER=log`, emails appear in
 | Catalogue: PIN stock | admin | Upload PINs (paste one per line or CSV of `pin[,serial]`); PINs always masked; per-service stock widget |
 | Orders → PINs tab | staff, admin | Result checker orders only; **Show PIN** is audited |
 | Administration: Access log (documents & PINs) | admin | Read-only; search by staff member or order reference |
+| Consultations: Bookings | staff, admin | Filter by date and status; add meeting link, reschedule, mark completed / no-show, cancel (customer emailed, except completed / no-show) |
+| Consultations: Availability | admin | Add one slot or a weekly pattern; cancel a slot (booked customers emailed); delete never-booked slots |
 
 **PIN uploads** (`App\Actions\Pins\ImportPinBatch`) are all-or-nothing. Any
 malformed line, duplicate within the batch, or PIN already in stock (for any
 service) rejects the whole batch, with the line numbers listed. The dashboard
-widget shows available PINs per checker, amber at or below
-`PIN_LOW_STOCK_THRESHOLD` and red at zero, plus how many paid orders are waiting.
+widget shows available PINs per checker, amber at or below the checker's
+threshold (default `PIN_LOW_STOCK_THRESHOLD`) and red at zero, plus how many
+paid orders are waiting. A successful upload immediately fulfils waiting orders.
 
 **Sensitive access audit.** Staff/admin opening a customer document
 (`LogDocumentAccess`) or revealing an allocated PIN (`LogPinAccess`) writes a
@@ -381,9 +423,10 @@ docker run --rm -v "$PWD:/var/www/html" -v madeeasy_test_vendor:/var/www/html/ve
 
 (PowerShell: use `"${PWD}:/var/www/html"`.) Tests use in-memory SQLite from `phpunit.xml`.
 
-`PinAllocationConcurrencyTest` needs real row locks, so it is skipped on SQLite.
-It starts several PHP processes that allocate from the same stock at the same
-moment. To run it, and the whole suite, against PostgreSQL, create a separate
+`PinAllocationConcurrencyTest` and `ConsultationBookingConcurrencyTest` need
+real row locks, so they are skipped on SQLite. They start several PHP
+processes that allocate from the same stock, or claim the same consultation
+slot, at the same moment. To run it, and the whole suite, against PostgreSQL, create a separate
 test database once (never point tests at `madeeasy`, because they wipe it), then
 pass the connection in:
 

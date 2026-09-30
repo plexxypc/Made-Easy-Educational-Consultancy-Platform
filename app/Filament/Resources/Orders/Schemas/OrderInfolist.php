@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\Orders\Schemas;
 
+use App\Filament\Resources\ConsultationBookings\ConsultationBookingResource;
 use App\Models\Order;
 use App\Models\OrderStatusChange;
 use App\Models\Payment;
 use App\Support\Money;
+use Filament\Actions\Action;
 use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -45,6 +47,21 @@ class OrderInfolist
                     ))
                     ->danger()
                     ->visible(fn (Order $record): bool => $record->undeliveredPinCount() > 0)
+                    ->columnSpanFull(),
+
+                Callout::make('Consultation booking')
+                    ->description(fn (Order $record): string => $record->consultationBooking
+                        ? $record->consultationBooking->slot->label().' · '.$record->consultationBooking->slot->consultation_type->getLabel().' · '.$record->consultationBooking->statusLabel()
+                            .'. Complete, cancel or reschedule it from the booking screen.'
+                        : 'No time was booked for this order.')
+                    ->info()
+                    ->actions([
+                        Action::make('openBooking')
+                            ->label('Open booking')
+                            ->url(fn (Order $record): ?string => $record->consultationBooking ? ConsultationBookingResource::getUrl('view', ['record' => $record->consultationBooking]) : null)
+                            ->visible(fn (Order $record): bool => $record->consultationBooking !== null),
+                    ])
+                    ->visible(fn (Order $record): bool => $record->isConsultation())
                     ->columnSpanFull(),
 
                 Section::make('Order')

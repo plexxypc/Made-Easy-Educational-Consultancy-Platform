@@ -13,7 +13,8 @@ use Illuminate\Queue\SerializesModels;
 
 /**
  * Confirms a service request was received and gives the reference.
- * Deliberately says nothing has been paid: payment comes later.
+ * Deliberately says nothing has been paid: payment comes later. Not sent for
+ * result checkers or consultations (see CreateServiceRequest).
  */
 class ServiceRequestReceivedMail extends Mailable implements ShouldQueue
 {
@@ -55,7 +56,6 @@ class ServiceRequestReceivedMail extends Mailable implements ShouldQueue
                 'service_name' => $this->order->serviceLabel(),
                 'price_label' => $this->order->isQuote() ? $this->order->service->priceLabel() : Money::format($this->order->total_amount, hide_zero_kobo: true),
                 'is_quote' => $this->order->isQuote(),
-                'is_result_checker' => $this->order->isResultChecker(),
                 'contact' => config('madeeasy.contact'),
                 'track_url' => route('orders.track.show', $this->order),
             ],

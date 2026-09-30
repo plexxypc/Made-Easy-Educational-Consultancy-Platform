@@ -21,13 +21,22 @@
             <p class="mt-2 text-sm text-slate-600">
                 @if ($is_quote)
                     The price depends on your request. We'll review your details and tell you the price before you pay anything.
+                @elseif ($service->isConsultation())
+                    Paid when you book your time.
                 @else
                     You won't be charged when you send this request. We'll contact you with the next steps, including how to pay.
                 @endif
             </p>
         </div>
 
-        @if (! $service->acceptsRequests())
+        @if ($service->isConsultation())
+            {{-- Consultations are booked into a time slot, not requested. --}}
+            <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+                <p class="text-lg font-semibold text-slate-900">Book online</p>
+                <p class="mt-2 text-slate-600">Choose a date and time that suits you and pay securely. We'll email your confirmation.</p>
+                <x-public.button :href="route('book-consultation')" class="mt-4">Book a consultation</x-public.button>
+            </div>
+        @elseif (! $service->acceptsRequests())
             {{-- Instant services (result checker PINs) are sold through the result checker store. --}}
             <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
                 <p class="text-lg font-semibold text-slate-900">Available from our Result Checker page</p>

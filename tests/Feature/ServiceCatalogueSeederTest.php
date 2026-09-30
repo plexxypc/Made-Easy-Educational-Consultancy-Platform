@@ -35,7 +35,8 @@ class ServiceCatalogueSeederTest extends TestCase
 
         $consultation = Service::query()->where('slug', 'admission-consultation')->sole();
         $this->assertSame(2_000_000, $consultation->price);
-        $this->assertTrue($consultation->is_active);
+        $this->assertSame(FulfilmentType::Consultation, $consultation->fulfilment_type);
+        $this->assertFalse($consultation->is_active, 'Admission Consultation is activated by hand once booking is tested.');
 
         $neco_checker = Service::query()->where('slug', 'neco-result-checker')->sole();
         $this->assertSame(Service::PLACEHOLDER_PRICE, $neco_checker->price);
