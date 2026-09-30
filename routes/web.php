@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ConsultationBookingController;
+use App\Http\Controllers\CustomerDashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderDocumentController;
 use App\Http\Controllers\OrderPaymentController;
@@ -76,13 +77,18 @@ Route::get('hello', Hello::class)->name('hello');
 /*
 | Signed-in area
 */
-Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
+// Where sign-in, registration and email verification land: the account dashboard.
+// Not behind "verified": unverified accounts still see orders placed while signed in.
+Route::redirect('dashboard', 'my-requests')
+    ->middleware(['auth'])
     ->name('dashboard');
 
-Route::get('my-requests', [OrderTrackingController::class, 'my_requests'])
+Route::get('my-requests', [CustomerDashboardController::class, 'show'])
     ->middleware(['auth'])
     ->name('my-requests');
+Route::post('my-requests/claim', [CustomerDashboardController::class, 'claim'])
+    ->middleware(['auth', 'verified', 'throttle:6,1'])
+    ->name('my-requests.claim');
 
 Route::view('profile', 'profile')
     ->middleware(['auth'])

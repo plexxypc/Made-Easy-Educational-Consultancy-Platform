@@ -192,7 +192,31 @@ They use the `<x-public-layout>` component. The nav comes from
 | `/track/{reference}/receipt` | Payment receipt (printable HTML; `?download=1` saves it as a file) |
 | `/track/{reference}/payment/return` | Where Paystack sends the customer back; display only |
 | `POST /webhooks/paystack` | Paystack webhook (signature-checked, CSRF-exempt) |
-| `/my-requests` | Signed-in customer's own orders (login required) |
+| `/my-requests?tab=` | Customer dashboard (login required); `/dashboard` redirects here |
+| `POST /my-requests/claim` | Add guest orders placed with the account's verified email (verified accounts only) |
+
+**Customer dashboard (`/my-requests`, PDF section 8).** Data comes from
+`App\Support\CustomerDashboard`, and everything is scoped by
+`Order::visibleTo($user)->whereBelongsTo($user)`. It has these tabs:
+
+- `requests`: Pending and Completed. Cancelled orders are listed under Completed.
+- `payments`: successful payments, each with a receipt and download link.
+- `documents`: documents from all orders, served through the audited
+  `/documents/{id}` route.
+- `consultations`: upcoming and past bookings, with the meeting link once set.
+- `pins`: allocated PINs behind **Show PIN**. Only staff and admin views are
+  audit-logged.
+- `messages`: status changes and staff notes from all orders, newest first.
+  Opening this tab marks them read (`users.messages_read_at`).
+
+**Email verification and claiming guest orders.** `User` implements
+`MustVerifyEmail`. Once the email is verified, `App\Actions\Customers\FindClaimableGuestOrders`
+looks for guest orders (no `user_id`) whose `guest_email` matches the account
+email, ignoring case and surrounding spaces. The dashboard asks the customer
+before linking them. `App\Actions\Customers\ClaimGuestOrders` then sets
+`user_id` and `claimed_at`. It re-checks every id under a row lock, so repeat
+claims do nothing and it never takes an order owned by someone else. There is
+no phone-based or reference-based claiming.
 
 **Service requests.** The form is built from each service's `customer_fields`,
 set in the admin under Services, then "Information required from the customer".
@@ -409,6 +433,11 @@ decision.
   ```
 
   Check with `docker compose exec app php artisan schedule:list`.
+- `consultations:remind-missing-meeting-links` runs every 15 minutes. It sends
+  staff and admins one notification (database and mail) for each confirmed
+  online or Google Meet booking that starts within 24 hours and has no meeting
+  link. `consultation_bookings.meeting_link_reminder_sent_at` stops a second
+  reminder, and rescheduling to a new time clears it.
 
 ## Tests
 

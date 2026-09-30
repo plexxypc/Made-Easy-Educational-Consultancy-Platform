@@ -60,7 +60,9 @@ class AuthenticationTest extends TestCase
 
         $this->actingAs($user);
 
-        $response = $this->get('/dashboard');
+        $this->get('/dashboard')->assertRedirect('/my-requests');
+
+        $response = $this->get('/profile');
 
         $response
             ->assertOk()

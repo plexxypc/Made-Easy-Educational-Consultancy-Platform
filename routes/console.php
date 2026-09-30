@@ -14,9 +14,10 @@ Artisan::command('inspire', function () {
 |--------------------------------------------------------------------------
 |
 | Triggered every minute by `php artisan schedule:run` from the host cron
-| (see README "Task scheduler"). Housekeeping only for now.
+| (see README "Task scheduler").
 |
 */
 
 Schedule::command('queue:prune-failed --hours=168')->daily();
 Schedule::command('auth:clear-resets')->everyFifteenMinutes();
+Schedule::command('consultations:remind-missing-meeting-links')->everyFifteenMinutes()->withoutOverlapping();

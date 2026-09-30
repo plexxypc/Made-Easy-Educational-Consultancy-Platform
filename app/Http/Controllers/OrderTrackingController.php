@@ -20,8 +20,9 @@ use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 /**
- * Customer-facing order tracking: guest lookup, the order page (with the
- * "needs action" response form) and the signed-in "My Requests" list.
+ * Customer-facing order tracking: guest lookup and the order page (with the
+ * "needs action" response form). The signed-in account dashboard ("My
+ * Requests") is CustomerDashboardController.
  *
  * Access to one order: TrackedOrders::allows() (owner, or reference + contact
  * proven in this session). Staff manage orders in the back office instead.
@@ -136,31 +137,5 @@ class OrderTrackingController extends Controller
         return redirect()
             ->route('orders.track.show', $order)
             ->with('status', "Thank you. We've received your response and will continue with your request.");
-    }
-
-    /**
-     * "My Requests": the signed-in user's own orders, newest first.
-     *
-     * Uses the policy-aligned visibleTo scope, further limited to orders the
-     * user placed: for staff/admin visibleTo means "everything", which is the
-     * back office's job, not this page's. Delivered result checker PINs are
-     * listed with their order, so the page is never cached.
-     *
-     * @param  Request  $request
-     * @return Response
-     */
-    public function my_requests(Request $request): Response
-    {
-        $user = $request->user();
-
-        return response()->view('orders.index', [
-            'orders' => Order::query()
-                ->visibleTo($user)
-                ->whereBelongsTo($user)
-                ->with(['service', 'consultationBooking.slot', 'pins' => fn ($query) => $query->where('status', PinStatus::Revealed->value)])
-                ->latest()
-                ->latest('id')
-                ->paginate(15),
-        ])->header('Cache-Control', 'private, no-store');
     }
 }

@@ -288,7 +288,7 @@ class PinAllocationTest extends TestCase
             ->assertOk()
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertSee($pin->pin);
-        $this->actingAs($customer)->get(route('my-requests'))->assertOk()->assertSee($pin->pin);
+        $this->actingAs($customer)->get(route('my-requests', ['tab' => 'pins']))->assertOk()->assertSee($pin->pin);
         $this->assertDatabaseCount('document_access_logs', 0);
 
         foreach ([$this->staff_user, User::factory()->admin()->create()] as $viewer) {

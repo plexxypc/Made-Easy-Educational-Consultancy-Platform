@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $meeting_link
  * @property int|null $meeting_link_added_by
  * @property Carbon|null $meeting_link_added_at
+ * @property Carbon|null $meeting_link_reminder_sent_at Staff reminded the link is missing (once per booking and time).
  * @property int|null $previous_slot_id Slot before the latest reschedule.
  * @property int $reschedule_count
  * @property Carbon|null $rescheduled_at
@@ -62,6 +63,7 @@ class ConsultationBooking extends Model
             'confirmed_at' => 'datetime',
             'needs_rebooking_at' => 'datetime',
             'meeting_link_added_at' => 'datetime',
+            'meeting_link_reminder_sent_at' => 'datetime',
             'reschedule_count' => 'integer',
             'rescheduled_at' => 'datetime',
             'closed_at' => 'datetime',

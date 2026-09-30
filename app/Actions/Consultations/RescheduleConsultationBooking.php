@@ -25,7 +25,8 @@ use Illuminate\Support\Facades\Mail;
  *    started. The old place is freed in the same transaction.
  *  - Any type may be chosen (e.g. WhatsApp to Google Meet). The meeting link
  *    is cleared whenever the slot changes, because a link belongs to a
- *    specific meeting: staff add a new one for the new time.
+ *    specific meeting: staff add a new one for the new time. The 24-hour
+ *    missing-link reminder is re-armed for the new time too.
  *  - The order history gets a note and the customer is emailed the new time.
  */
 class RescheduleConsultationBooking
@@ -83,6 +84,7 @@ class RescheduleConsultationBooking
                 'meeting_link' => $slot_changed ? null : $locked_booking->meeting_link,
                 'meeting_link_added_by' => $slot_changed ? null : $locked_booking->meeting_link_added_by,
                 'meeting_link_added_at' => $slot_changed ? null : $locked_booking->meeting_link_added_at,
+                'meeting_link_reminder_sent_at' => $slot_changed ? null : $locked_booking->meeting_link_reminder_sent_at,
             ])->save();
 
             OrderStatusChange::create([

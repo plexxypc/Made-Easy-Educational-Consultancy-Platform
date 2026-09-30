@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $reference Customer-facing: "ME-XXXXXX", or the old order number ("12") for orders placed before random references.
  * @property int|null $user_id Null for guest orders (guest_* columns filled instead).
+ * @property Carbon|null $claimed_at When the account owner added this guest order to their account.
  * @property int $service_id
  * @property int $quantity Units ordered; above 1 only for result checkers.
  * @property OrderStatus $status
@@ -150,6 +151,7 @@ class Order extends Model
             'total_amount' => 'integer',
             'field_answers' => 'array',
             'quoted_at' => 'datetime',
+            'claimed_at' => 'datetime',
         ];
     }
 
