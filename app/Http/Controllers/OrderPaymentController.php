@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Payments\InitiatePayment;
+use App\Actions\Receipts\RenderReceiptPdf;
 use App\Enums\PaymentStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Http\Requests\PayForOrderRequest;
@@ -110,13 +111,15 @@ class OrderPaymentController extends Controller
     }
 
     /**
-     * The receipt for a paid order, as a printable page (?download=1 saves it as a file).
+     * The receipt for a paid order as a PDF: opened in the browser, or saved
+     * as a file with ?download=1. Same PDF as the one attached to the email.
      *
      * @param  Request  $request
      * @param  Order  $order
+     * @param  RenderReceiptPdf  $render_receipt_pdf
      * @return Response|RedirectResponse
      */
-    public function receipt(Request $request, Order $order): Response|RedirectResponse
+    public function receipt(Request $request, Order $order, RenderReceiptPdf $render_receipt_pdf): Response|RedirectResponse
     {
         if (! TrackedOrders::allows($request, $order)) {
             return redirect()
@@ -131,12 +134,13 @@ class OrderPaymentController extends Controller
             return redirect()->route('orders.track.show', $order);
         }
 
-        $response = response()->view('orders.receipt', ['receipt' => $receipt]);
+        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
 
-        if ($request->boolean('download')) {
-            $response->header('Content-Disposition', 'attachment; filename="receipt-'.$receipt->number.'.html"');
-        }
-
-        return $response->header('Cache-Control', 'private, no-store');
+        return response($render_receipt_pdf->handle($receipt), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition.'; filename="'.$render_receipt_pdf->file_name($receipt).'"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\ReadsPdfs;
 use Tests\TestCase;
 
 /**
@@ -28,7 +29,7 @@ use Tests\TestCase;
  */
 class PaystackPaymentTest extends TestCase
 {
-    use RefreshDatabase;
+    use ReadsPdfs, RefreshDatabase;
 
     /**
      * @var string
@@ -312,19 +313,20 @@ class PaystackPaymentTest extends TestCase
             ->assertSee(route('orders.receipt', $this->order))
             ->assertDontSee(route('orders.pay', $this->order));
 
-        $this->get(route('orders.receipt', $this->order))
+        $response = $this->get(route('orders.receipt', $this->order))
             ->assertOk()
-            ->assertSee('Payment receipt')
-            ->assertSee($receipt->number)
-            ->assertSee($payment->paystack_reference)
-            ->assertSee('Ada Obi')
-            ->assertSee('Birth Certificate')
-            ->assertSee('₦15,000.00')
-            ->assertSee('Successful');
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'inline; filename="receipt-'.$receipt->number.'.pdf"');
+        $text = $this->pdf_text($response->getContent());
+
+        foreach (['Payment receipt', $receipt->number, $payment->paystack_reference, $this->order->reference, 'Ada Obi', 'Birth Certificate', '₦15,000.00', 'Successful'] as $expected) {
+            $this->assertStringContainsString($expected, $text);
+        }
 
         $this->get(route('orders.receipt', ['order' => $this->order, 'download' => 1]))
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename="receipt-'.$receipt->number.'.html"');
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'attachment; filename="receipt-'.$receipt->number.'.pdf"');
     }
 
     /**
@@ -498,7 +500,9 @@ class PaystackPaymentTest extends TestCase
         $this->get(route('orders.payment.return', ['order' => $this->order, 'reference' => $payment->paystack_reference, 'trxref' => $payment->paystack_reference]))
             ->assertOk()
             ->assertSee('Payment received, confirming')
-            ->assertSee('http-equiv="refresh"', false);
+            ->assertSee('http-equiv="refresh"', false)
+            // Escaped once, so the browser really sends check=2 (a double-escaped "&amp;amp;" never would).
+            ->assertSee('content="5;url='.e(route('orders.payment.return', ['order' => $this->order, 'reference' => $payment->paystack_reference, 'check' => 2])).'"', false);
 
         Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'https://api.paystack.co/transaction/verify/'.$payment->paystack_reference);
         $this->assertSame(PaymentStatus::Initiated, $payment->refresh()->status);

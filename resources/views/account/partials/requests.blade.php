@@ -38,3 +38,12 @@
         @endif
     </section>
 @endif
+
+{{-- After "Not now" on the claim prompt: a quiet way back, never the prompt itself. --}}
+@if ($dismissed_claim_count > 0)
+    <form method="POST" action="{{ route('my-requests.claim.restore') }}" class="mt-8 border-t border-slate-200 pt-4 text-sm text-slate-600">
+        @csrf
+        {{ trans_choice('You chose not to add :count request placed as a guest with your email.|You chose not to add :count requests placed as a guest with your email.', $dismissed_claim_count) }}
+        <button type="submit" class="font-semibold text-brand-700 underline">Review {{ $dismissed_claim_count === 1 ? 'it' : 'them' }}</button>
+    </form>
+@endif

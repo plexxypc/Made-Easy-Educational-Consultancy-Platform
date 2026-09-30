@@ -66,6 +66,21 @@
         @endif
     </section>
 
+    {{-- Latest Updates: the three newest published posts. Hidden until something is published. --}}
+    @if ($latest_posts->isNotEmpty())
+        <section class="mx-auto max-w-6xl px-4 py-12 sm:px-6" aria-labelledby="latest-updates-heading">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+                <h2 id="latest-updates-heading" class="text-2xl font-bold text-slate-900">Latest Updates</h2>
+                <a href="{{ route('updates') }}" class="text-sm font-semibold text-brand-700 hover:underline">All updates &rarr;</a>
+            </div>
+            <ul class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($latest_posts as $post)
+                    <x-public.post-card :post="$post" heading="h3" />
+                @endforeach
+            </ul>
+        </section>
+    @endif
+
     {{-- PLACEHOLDER (PDF section 12): Mathematics online tutorials promo with WhatsApp contact. Later prompt. --}}
 
     {{-- PLACEHOLDER (PDF section 15): testimonials. Later prompt. --}}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Customers\ClaimGuestOrders;
+use App\Actions\Customers\DismissGuestOrderClaims;
 use App\Actions\Customers\FindClaimableGuestOrders;
 use App\Actions\Pins\LogPinAccess;
 use App\Exceptions\BusinessRuleException;
@@ -66,6 +67,7 @@ class CustomerDashboardController extends Controller
             'tabs' => CustomerDashboard::TABS,
             'tab_counts' => $dashboard->tab_counts(),
             'claimable_orders' => $find_claimable_guest_orders->handle($user),
+            'dismissed_claim_count' => $tab === 'requests' ? $find_claimable_guest_orders->dismissed_count($user) : 0,
             'email_verified' => $user->hasVerifiedEmail(),
             ...$data,
         ])->header('Cache-Control', 'private, no-store');
@@ -91,5 +93,35 @@ class CustomerDashboardController extends Controller
             ->with('status', $claimed > 0
                 ? trans_choice(':count request has been added to your account.|:count requests have been added to your account.', $claimed)
                 : 'There was nothing new to add to your account.');
+    }
+
+    /**
+     * "Not now" on the prompt: stop showing it for these guest orders.
+     *
+     * @param  Request  $request
+     * @param  DismissGuestOrderClaims  $dismiss_guest_order_claims
+     * @return RedirectResponse
+     */
+    public function dismiss_claim(Request $request, DismissGuestOrderClaims $dismiss_guest_order_claims): RedirectResponse
+    {
+        $dismiss_guest_order_claims->handle($request->user());
+
+        return redirect()
+            ->route('my-requests')
+            ->with('status', "OK, we won't ask about those requests again. You can still add them later from Services & Applications.");
+    }
+
+    /**
+     * Bring back the prompt for guest orders dismissed earlier.
+     *
+     * @param  Request  $request
+     * @param  DismissGuestOrderClaims  $dismiss_guest_order_claims
+     * @return RedirectResponse
+     */
+    public function restore_claim(Request $request, DismissGuestOrderClaims $dismiss_guest_order_claims): RedirectResponse
+    {
+        $dismiss_guest_order_claims->restore($request->user());
+
+        return redirect()->route('my-requests');
     }
 }

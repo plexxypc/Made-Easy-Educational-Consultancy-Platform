@@ -52,7 +52,7 @@ COPY --from=assets /var/www/html/public/build ./public/build
 # assets into public/). The array/sync drivers keep it from touching the DB.
 RUN CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync \
         composer dump-autoload --optimize --no-dev --no-interaction \
-    && mkdir -p storage/app/private storage/framework/cache/data storage/framework/sessions \
+    && mkdir -p storage/app/private storage/app/public storage/fonts storage/framework/cache/data storage/framework/sessions \
         storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && sed -i 's/\r$//' docker/php/entrypoint.sh \

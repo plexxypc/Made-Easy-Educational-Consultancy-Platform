@@ -10,6 +10,7 @@ use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ResultCheckerController;
 use App\Http\Controllers\ServiceCatalogueController;
 use App\Http\Controllers\ServiceRequestController;
+use App\Http\Controllers\UpdatesController;
 use App\Livewire\Hello;
 use Illuminate\Support\Facades\Route;
 
@@ -66,8 +67,12 @@ Route::post('book-consultation', [ConsultationBookingController::class, 'book'])
     ->middleware(['throttle:service-requests', 'throttle:order-payments'])
     ->name('book-consultation.book');
 
-// Placeholder: updates/blog is built in a later prompt.
-Route::view('updates', 'pages.updates')->name('updates');
+// Updates (blog): published posts only; drafts and scheduled posts 404.
+Route::get('updates', [UpdatesController::class, 'index'])->name('updates');
+Route::get('updates/category/{post_category:slug}', [UpdatesController::class, 'category'])->name('updates.category');
+Route::get('updates/{slug}', [UpdatesController::class, 'show'])
+    ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+    ->name('updates.show');
 
 Route::view('about', 'pages.about')->name('about');
 Route::view('contact', 'pages.contact')->name('contact');
@@ -89,6 +94,12 @@ Route::get('my-requests', [CustomerDashboardController::class, 'show'])
 Route::post('my-requests/claim', [CustomerDashboardController::class, 'claim'])
     ->middleware(['auth', 'verified', 'throttle:6,1'])
     ->name('my-requests.claim');
+Route::post('my-requests/claim/dismiss', [CustomerDashboardController::class, 'dismiss_claim'])
+    ->middleware(['auth', 'throttle:6,1'])
+    ->name('my-requests.claim.dismiss');
+Route::post('my-requests/claim/restore', [CustomerDashboardController::class, 'restore_claim'])
+    ->middleware(['auth', 'throttle:6,1'])
+    ->name('my-requests.claim.restore');
 
 Route::view('profile', 'profile')
     ->middleware(['auth'])

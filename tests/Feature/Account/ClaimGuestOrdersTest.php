@@ -153,6 +153,95 @@ class ClaimGuestOrdersTest extends TestCase
     }
 
     /**
+     * "Not now" is remembered on the account: the prompt stays gone on later
+     * visits and new sessions, and nothing is linked. Only a guest order
+     * placed after the dismissal brings it back, listing just that order.
+     *
+     * @return void
+     */
+    public function test_dismissing_the_prompt_is_remembered(): void
+    {
+        $ada = User::factory()->create(['email' => 'ada@example.com']);
+        $old_order = $this->guest_order('ada@example.com', 'Old Guest Service');
+
+        $this->actingAs($ada)->get(route('my-requests'))->assertSee('We found 1 request placed as a guest');
+
+        $this->post(route('my-requests.claim.dismiss'))
+            ->assertRedirect(route('my-requests'))
+            ->assertSessionHas('status');
+        $this->assertNotNull($ada->refresh()->guest_claims_dismissed_at);
+        $this->assertNull($old_order->refresh()->user_id);
+
+        foreach (['requests', 'payments', 'messages'] as $tab) {
+            $this->get(route('my-requests', ['tab' => $tab]))->assertOk()->assertDontSee('We found')->assertDontSee('Not now');
+        }
+
+        // A fresh sign-in (another session or device) still remembers it.
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
+        $this->actingAs(User::query()->find($ada->id));
+        $this->travel(2)->days();
+        $this->get(route('my-requests'))->assertOk()->assertDontSee('We found')->assertDontSee('Old Guest Service');
+
+        // A new guest order placed later is a new question.
+        $this->travel(1)->minutes();
+        $new_order = $this->guest_order('ada@example.com', 'New Guest Service');
+        $this->get(route('my-requests'))
+            ->assertSee('We found 1 request placed as a guest')
+            ->assertSee('New Guest Service')
+            ->assertSee('value="'.$new_order->id.'"', false)
+            ->assertDontSee('value="'.$old_order->id.'"', false);
+    }
+
+    /**
+     * The customer can change their mind: the dismissed orders can be shown
+     * again, from a quiet link, and claimed as usual.
+     *
+     * @return void
+     */
+    public function test_dismissed_orders_can_be_reviewed_and_claimed_later(): void
+    {
+        $ada = User::factory()->create(['email' => 'ada@example.com']);
+        $order = $this->guest_order('ada@example.com', 'Guest Service');
+
+        $this->actingAs($ada)->post(route('my-requests.claim.dismiss'));
+
+        $this->get(route('my-requests'))
+            ->assertDontSee('We found')
+            ->assertSee('You chose not to add 1 request placed as a guest with your email.')
+            ->assertSee(route('my-requests.claim.restore'), false);
+
+        $this->post(route('my-requests.claim.restore'))->assertRedirect(route('my-requests'));
+        $this->get(route('my-requests'))->assertSee('We found 1 request placed as a guest')->assertDontSee('You chose not to add');
+
+        $this->post(route('my-requests.claim'), ['orders' => [$order->id]])->assertSessionHas('status', '1 request has been added to your account.');
+        $this->assertTrue($order->refresh()->isOwnedBy($ada));
+    }
+
+    /**
+     * A dismissal was about the old email; a new email starts afresh.
+     * Guests can't dismiss anything.
+     *
+     * @return void
+     */
+    public function test_changing_email_forgets_the_dismissal(): void
+    {
+        $ada = User::factory()->create(['email' => 'ada@example.com']);
+        $this->actingAs($ada)->post(route('my-requests.claim.dismiss'));
+        $this->assertNotNull($ada->refresh()->guest_claims_dismissed_at);
+
+        $ada->forceFill(['name' => 'Ada O.'])->save();
+        $this->assertNotNull($ada->refresh()->guest_claims_dismissed_at);
+
+        $ada->forceFill(['email' => 'ada.obi@example.com'])->save();
+        $this->assertNull($ada->refresh()->guest_claims_dismissed_at);
+
+        $this->app['auth']->forgetGuards();
+        $this->post(route('my-requests.claim.dismiss'))->assertRedirect('/login');
+        $this->post(route('my-requests.claim.restore'))->assertRedirect('/login');
+    }
+
+    /**
      * @param  string  $email
      * @param  string  $service_name
      * @param  string|null  $phone

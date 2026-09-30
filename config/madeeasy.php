@@ -117,4 +117,19 @@ return [
         'allowed_mime_types' => ['application/pdf', 'image/jpeg', 'image/png'],
     ],
 
+    /*
+     * Updates (blog, /updates).
+     *  - timezone: publish dates are entered and shown in this zone (stored in UTC).
+     *  - per_page: posts per page on the public index.
+     *  - image_*: featured images and images in the post body. They are public
+     *    marketing images on the "public" disk. SVG is not allowed (it can
+     *    carry scripts); the type is checked from the file contents.
+     */
+    'blog' => [
+        'timezone' => env('BLOG_TIMEZONE', 'Africa/Lagos'),
+        'per_page' => 9,
+        'image_max_kilobytes' => (int) env('BLOG_IMAGE_MAX_KILOBYTES', 2048),
+        'image_mime_types' => ['image/jpeg', 'image/png', 'image/webp'],
+    ],
+
 ];

@@ -24,12 +24,25 @@
 		-Server
 	}
 
-	# Never serve dotfiles (.env, .git, ...) even if one ends up in public/.
 	@dotfiles path */.*
-	respond @dotfiles 404
 
-	php_fastcgi app:9000
-	file_server
+	# "route" keeps these in the order written.
+	route {
+		# Never serve dotfiles (.env, .git, ...) even if one ends up in public/.
+		respond @dotfiles 404
+
+		# Public disk (Updates images) from its own read-only volume. Private
+		# uploads live in a different volume that Caddy never mounts. Files
+		# are served as stored, never executed, and never listed.
+		handle_path /storage/* {
+			root * /srv/public-media
+			header Cache-Control "public, max-age=604800"
+			file_server
+		}
+
+		php_fastcgi app:9000
+		file_server
+	}
 
 	log {
 		output stdout

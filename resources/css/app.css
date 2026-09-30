@@ -1,3 +1,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Rich text from the Updates post editor (resources/views/updates/show.blade.php). */
+@layer components {
+    .post-body {
+        @apply text-base leading-relaxed text-slate-800;
+    }
+    .post-body > * + * {
+        @apply mt-4;
+    }
+    .post-body h2 {
+        @apply mt-8 text-2xl font-bold text-slate-900;
+    }
+    .post-body h3 {
+        @apply mt-6 text-xl font-semibold text-slate-900;
+    }
+    .post-body a {
+        @apply font-semibold text-brand-700 underline;
+    }
+    .post-body ul {
+        @apply list-disc pl-6;
+    }
+    .post-body ol {
+        @apply list-decimal pl-6;
+    }
+    .post-body li + li {
+        @apply mt-1;
+    }
+    .post-body blockquote {
+        @apply border-l-4 border-brand-300 pl-4 italic text-slate-700;
+    }
+    .post-body img {
+        @apply h-auto max-w-full rounded-xl;
+    }
+    .post-body table {
+        @apply block w-full overflow-x-auto border-collapse text-sm;
+    }
+    .post-body th,
+    .post-body td {
+        @apply border border-slate-200 px-3 py-2 text-left align-top;
+    }
+    .post-body th {
+        @apply bg-slate-50 font-semibold;
+    }
+}

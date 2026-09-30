@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AdminUserSeeder::class,
             ServiceCatalogueSeeder::class,
+            PostCategorySeeder::class,
             TestUsersSeeder::class, // skipped in production
         ]);
     }

@@ -2,17 +2,19 @@
 
 namespace App\Mail;
 
+use App\Actions\Receipts\RenderReceiptPdf;
 use App\Models\Receipt;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Payment receipt, sent after a verified payment marks the order paid.
- * The receipt is also viewable/downloadable from the order page.
+ * Payment receipt, sent after a verified payment marks the order paid, with
+ * the receipt PDF attached. The same PDF is on the order page and dashboard.
  */
 class PaymentReceiptMail extends Mailable implements ShouldQueue
 {
@@ -60,5 +62,20 @@ class PaymentReceiptMail extends Mailable implements ShouldQueue
                 'pin_noun' => $order->quantity > 1 ? 'PINs' : 'PIN',
             ],
         );
+    }
+
+    /**
+     * The receipt PDF, rendered when the email is sent (on the queue).
+     *
+     * @return array<int, Attachment>
+     */
+    public function attachments(): array
+    {
+        $render_receipt_pdf = app(RenderReceiptPdf::class);
+
+        return [
+            Attachment::fromData(fn (): string => $render_receipt_pdf->handle($this->receipt), $render_receipt_pdf->file_name($this->receipt))
+                ->withMime('application/pdf'),
+        ];
     }
 }

@@ -21,10 +21,16 @@ use Illuminate\Database\Eloquent\Collection;
  *    someone else's order (the risk avoided in guest tracking).
  *  - Deleted orders are never offered.
  *  - Finding orders links nothing: the customer must accept (ClaimGuestOrders).
+ *  - "Not now" (DismissGuestOrderClaims) stops the prompt for the orders it
+ *    was shown for: only guest orders placed AFTER the dismissal bring it
+ *    back. Assumption: a new guest order is a new question worth asking.
+ *    The customer can bring the dismissed ones back themselves (restore).
  */
 class FindClaimableGuestOrders
 {
     /**
+     * Orders to show in the claim prompt.
+     *
      * @param  User  $user
      * @return Collection<int, Order> Newest first; empty if the email isn't verified.
      */
@@ -34,11 +40,31 @@ class FindClaimableGuestOrders
             return new Collection;
         }
 
-        return self::query_for($user)->with('service')->latest()->latest('id')->get();
+        return self::query_for($user)
+            ->when($user->guest_claims_dismissed_at, fn (Builder $query) => $query->where('created_at', '>', $user->guest_claims_dismissed_at))
+            ->with('service')
+            ->latest()
+            ->latest('id')
+            ->get();
     }
 
     /**
-     * The claimable-orders query (without the verification check).
+     * How many matching guest orders are hidden by a "Not now".
+     *
+     * @param  User  $user
+     * @return int
+     */
+    public function dismissed_count(User $user): int
+    {
+        if (! $user->hasVerifiedEmail() || $user->guest_claims_dismissed_at === null) {
+            return 0;
+        }
+
+        return self::query_for($user)->where('created_at', '<=', $user->guest_claims_dismissed_at)->count();
+    }
+
+    /**
+     * The claimable-orders query (without the verification or dismissal checks).
      *
      * @param  User  $user
      * @return Builder<Order>

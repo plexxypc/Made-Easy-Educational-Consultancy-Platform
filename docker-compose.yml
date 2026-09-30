@@ -14,6 +14,9 @@ x-app-image: &app-image
   volumes:
     # Persistent storage: private uploads (storage/app/private), logs, sessions.
     - app_storage:/var/www/html/storage
+    # Public marketing images (Updates posts), the "public" disk. A separate
+    # volume so Caddy can serve it without ever seeing private uploads.
+    - public_media:/var/www/html/storage/app/public
   depends_on:
     db:
       condition: service_healthy
@@ -61,6 +64,8 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      # Only the public disk, read-only, served at /storage/*.
+      - public_media:/srv/public-media:ro
     depends_on:
       - app
     networks:
@@ -85,6 +90,7 @@ services:
 
 volumes:
   app_storage:
+  public_media:
   db_data:
   caddy_data:
   caddy_config:

@@ -30,16 +30,24 @@
                         </li>
                     @endforeach
                 </ul>
-                <form method="POST" action="{{ route('my-requests.claim') }}" class="mt-4">
-                    @csrf
-                    @foreach ($claimable_orders as $claimable_order)
-                        <input type="hidden" name="orders[]" value="{{ $claimable_order->id }}">
-                    @endforeach
-                    <button type="submit" class="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-brand-700 px-6 font-semibold text-white shadow-sm hover:bg-brand-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-300">
-                        Yes, add {{ $claimable_orders->count() === 1 ? 'it' : 'them' }} to my account
-                    </button>
-                    <span class="ml-2 text-sm text-slate-600">Not yours? Just ignore this; nothing changes unless you accept.</span>
-                </form>
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <form method="POST" action="{{ route('my-requests.claim') }}">
+                        @csrf
+                        @foreach ($claimable_orders as $claimable_order)
+                            <input type="hidden" name="orders[]" value="{{ $claimable_order->id }}">
+                        @endforeach
+                        <button type="submit" class="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-brand-700 px-6 font-semibold text-white shadow-sm hover:bg-brand-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-300">
+                            Yes, add {{ $claimable_orders->count() === 1 ? 'it' : 'them' }} to my account
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ route('my-requests.claim.dismiss') }}">
+                        @csrf
+                        <button type="submit" class="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-slate-300 bg-white px-6 font-semibold text-slate-800 hover:bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-300">
+                            Not now
+                        </button>
+                    </form>
+                </div>
+                <p class="mt-2 text-sm text-slate-600">Nothing changes unless you accept. "Not now" stops us asking about these requests.</p>
             </section>
         @elseif (! $email_verified)
             <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-slate-800">

@@ -1,7 +1,7 @@
 <x-mail::message>
 Hello {{ $receipt->customer_name }},
 
-Thank you, we've received your payment. Here is your receipt.
+Thank you, we've received your payment. Your receipt is attached as a PDF, and the details are below.
 
 <x-mail::table>
 | | |
@@ -23,7 +23,7 @@ Thank you, we've received your payment. Here is your receipt.
 </x-mail::table>
 
 <x-mail::button :url="$receipt_url">
-View or download receipt
+Download receipt (PDF)
 </x-mail::button>
 
 @if ($is_result_checker)

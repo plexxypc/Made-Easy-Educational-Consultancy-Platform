@@ -1,4 +1,4 @@
-<x-public-layout title="Confirming your payment" :refresh_url="$refresh_url">
+<x-public-layout title="Confirming your payment" :refresh-url="$refresh_url">
     <section class="mx-auto max-w-xl px-4 py-14 sm:px-6">
         <div class="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-10" role="status">
             <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Reference {{ $order->display_reference }}</p>

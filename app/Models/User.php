@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  *
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $messages_read_at When they last opened Messages on their dashboard.
+ * @property Carbon|null $guest_claims_dismissed_at When they said "Not now" to the guest-order claim prompt.
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
@@ -45,8 +46,24 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'messages_read_at' => 'datetime',
+            'guest_claims_dismissed_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * A "Not now" to the claim prompt was about orders placed with the old
+     * email, so changing the email forgets it.
+     *
+     * @return void
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->exists && $user->isDirty('email')) {
+                $user->guest_claims_dismissed_at = null;
+            }
+        });
     }
 
     /**

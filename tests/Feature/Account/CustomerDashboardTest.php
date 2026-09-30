@@ -179,7 +179,7 @@ class CustomerDashboardTest extends TestCase
         $this->get(route('my-requests', ['tab' => 'payments']))->assertOk()->assertSee(route('orders.receipt', ['order' => $data['paid'], 'download' => 1]), false);
         $this->get(route('orders.receipt', ['order' => $data['paid'], 'download' => 1]))
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename="receipt-'.$data['paid']->receipt->number.'.html"');
+            ->assertHeader('Content-Disposition', 'attachment; filename="receipt-'.$data['paid']->receipt->number.'.pdf"');
         $this->get(route('order-documents.show', ['order_document' => $data['document'], 'download' => 1]))->assertOk();
 
         $this->assertDatabaseCount('document_access_logs', 0);

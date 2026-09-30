@@ -26,9 +26,15 @@ payments) yet.
   `SITE_ADDRESS` in `.env`.
 - **db**: PostgreSQL 16 with data in the `db_data` named volume.
 
-Named volumes: `db_data` (database), `app_storage` (Laravel `storage/`,
-including private uploads in `storage/app/private`), `caddy_data` and
-`caddy_config` (TLS certificates, which must persist so Let's Encrypt isn't re-hit).
+Named volumes:
+
+- `db_data`: the database.
+- `app_storage`: Laravel `storage/`, including private uploads in
+  `storage/app/private`. Caddy never mounts it.
+- `public_media`: the `public` disk (`storage/app/public`), which holds only
+  Updates images. Caddy mounts it read-only and serves it at `/storage/*`.
+- `caddy_data` and `caddy_config`: TLS certificates. They must persist so
+  Let's Encrypt isn't re-hit.
 
 Code and front-end assets are baked into the images, so **after changing code, rebuild**:
 `docker compose up -d --build`.
@@ -121,6 +127,8 @@ docker compose exec app php artisan db:seed --force    # production
   never overwrites prices an admin has changed. Services without a documented
   price get a ₦1,000 placeholder and are seeded **inactive**; quote services
   have price 0.
+- `PostCategorySeeder` seeds the 12 Updates categories from PDF section 10
+  (JAMB News … NIN/JAMB Information). It only creates missing ones.
 - `TestUsersSeeder` seeds the staff/admin/customer test accounts above. It is
   skipped in production.
 
@@ -185,11 +193,13 @@ They use the `<x-public-layout>` component. The nav comes from
 | `/services/{category}/{service}` | Service detail and the **Request this service** form |
 | `/result-checker` | **Buy Result Checker**: pick a checker and quantity, then **Buy now** straight to Paystack |
 | `/book-consultation` | **Book a Consultation**: pick an open time, give contact details, pay through Paystack |
-| `/updates` | Placeholder until its later prompt |
+| `/updates` | **Updates** (blog): published posts, newest first, 9 per page, with category links |
+| `/updates/category/{slug}` | Published posts in one category |
+| `/updates/{slug}` | One published post, with its meta title and description as the page `<title>` and `<meta>` |
 | `/about`, `/contact` | About (placeholder copy) and Contact |
 | `/track` | **Track your request**: reference plus the email or phone used |
 | `/track/{reference}` | Order page: status, answers, documents, messages, **Pay now**, receipt and the needs-action response form |
-| `/track/{reference}/receipt` | Payment receipt (printable HTML; `?download=1` saves it as a file) |
+| `/track/{reference}/receipt` | Payment receipt PDF, opened in the browser; `?download=1` saves it as `receipt-MER-000042.pdf` |
 | `/track/{reference}/payment/return` | Where Paystack sends the customer back; display only |
 | `POST /webhooks/paystack` | Paystack webhook (signature-checked, CSRF-exempt) |
 | `/my-requests?tab=` | Customer dashboard (login required); `/dashboard` redirects here |
@@ -217,6 +227,16 @@ before linking them. `App\Actions\Customers\ClaimGuestOrders` then sets
 `user_id` and `claimed_at`. It re-checks every id under a row lock, so repeat
 claims do nothing and it never takes an order owned by someone else. There is
 no phone-based or reference-based claiming.
+
+**Not now** (`POST /my-requests/claim/dismiss`) sets
+`users.guest_claims_dismissed_at`, so the choice holds across sessions and
+devices. After that:
+
+- The prompt no longer appears for guest orders placed before that time.
+- A guest order placed later asks again, listing only the new one.
+- The Services & Applications tab keeps a small "Review them" link
+  (`POST /my-requests/claim/restore`) in case the customer changes their mind.
+- Changing the account email clears the dismissal.
 
 **Service requests.** The form is built from each service's `customer_fields`,
 set in the admin under Services, then "Information required from the customer".
@@ -281,7 +301,11 @@ with a total above ₦0. A quote order becomes payable only after **Set Total**
 - The charge is applied only if the status, currency (NGN) and amount exactly
   match and the order is still `pending_payment`. Then the payment becomes
   `successful`, the order `paid`, and a `receipts` snapshot is created and
-  emailed (`PaymentReceiptMail`).
+  emailed (`PaymentReceiptMail`) with the receipt PDF attached. The PDF is
+  rendered by `App\Actions\Receipts\RenderReceiptPdf` (dompdf, template
+  `resources/views/receipts/pdf.blade.php`). The same PDF is served from the
+  order page and dashboard. dompdf runs with remote files, PHP and JavaScript
+  off.
 - Anything else is **not applied**. The payment keeps a `review_reason`, the
   event is logged at error level, and staff get a `PaymentNeedsReview`
   notification (plus email when `EMAIL_STAFF_ON_PAYMENT_REVIEW=true`). The order
@@ -379,6 +403,27 @@ With `LOG_CHANNEL=stderr` and `MAIL_MAILER=log`, emails appear in
 | Administration: Access log (documents & PINs) | admin | Read-only; search by staff member or order reference |
 | Consultations: Bookings | staff, admin | Filter by date and status; add meeting link, reschedule, mark completed / no-show, cancel (customer emailed, except completed / no-show) |
 | Consultations: Availability | admin | Add one slot or a weekly pattern; cancel a slot (booked customers emailed); delete never-booked slots |
+| Updates: Posts | staff write, admin publishes | Rich text, featured image, category, auto-slug, SEO fields, publish date/time; list shows Published / Scheduled / Draft |
+
+**Updates posts** (`App\Models\Post`, `PostPolicy`):
+
+- **Status** comes from `published_at`. Empty is a draft, a future time is
+  scheduled, and a past time is published. A scheduled post goes live by
+  itself because public pages compare against now(), so no job is needed.
+  Publish times are entered in `BLOG_TIMEZONE` (default Africa/Lagos).
+- **Staff** create posts and edit or delete drafts. They cannot set a publish
+  date: the field is disabled and `App\Actions\Posts\SavePost` drops it on the
+  server. They also cannot change a post once it is scheduled or live.
+- **Admins** do everything, including **Publish now** and **Unpublish** from
+  the list (`SetPostPublishDate`, logged).
+- **Body HTML** from the editor is sanitised on output by Filament's renderer
+  (`Post::bodyHtml()`), which strips scripts, event handlers and
+  `javascript:` links.
+- **Images** (featured image and images in the body) go to the `public` disk
+  under `posts/`. They must be JPEG, PNG or WebP, up to
+  `BLOG_IMAGE_MAX_KILOBYTES` (default 2 MB), with the type checked from the
+  contents. SVG is refused. A replaced or deleted featured image is removed
+  from disk.
 
 **PIN uploads** (`App\Actions\Pins\ImportPinBatch`) are all-or-nothing. Any
 malformed line, duplicate within the batch, or PIN already in stock (for any
@@ -516,7 +561,8 @@ Assumes a fresh Ubuntu 24.04 KVM VPS and a domain you control.
 9. **Scheduler**: add the cron entry from [Queue and task scheduler](#queue-and-task-scheduler).
 10. **Backups** (recommended): nightly `pg_dump`, e.g.
     `docker compose exec -T db pg_dump -U madeeasy madeeasy | gzip > /root/backups/madeeasy-$(date +\%F).sql.gz`,
-    plus the `app_storage` volume (private uploads). Copy both off the server.
+    plus the `app_storage` volume (private uploads) and the `public_media`
+    volume (Updates images). Copy them all off the server.
 
 **Subsequent deploys:**
 
