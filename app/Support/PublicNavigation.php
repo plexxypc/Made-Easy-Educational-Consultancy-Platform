@@ -26,15 +26,18 @@ class PublicNavigation
     public const DOCUMENTS_CATEGORY_SLUG = 'document-services';
 
     /**
-     * Nav items in display order.
+     * Nav items in display order. "Admission" also has sub-links (children):
+     * the Admission services page and the course & cut-off search.
      *
      * @param  Request  $request
-     * @return array<int, array{label: string, url: string, active: bool}>
+     * @return array<int, array{label: string, url: string, active: bool, children?: array<int, array{label: string, url: string, active: bool}>}>
      */
     public static function items(Request $request): array
     {
         $current_category_slug = self::current_category_slug($request);
         $in_catalogue = $request->routeIs('services.*');
+        $on_admission_page = $in_catalogue && $current_category_slug === self::ADMISSION_CATEGORY_SLUG;
+        $admission_url = route('services.category', ['category' => self::ADMISSION_CATEGORY_SLUG]);
 
         return [
             ['label' => 'Home', 'url' => route('home'), 'active' => $request->routeIs('home')],
@@ -45,8 +48,12 @@ class PublicNavigation
             ],
             [
                 'label' => 'Admission',
-                'url' => route('services.category', ['category' => self::ADMISSION_CATEGORY_SLUG]),
-                'active' => $in_catalogue && $current_category_slug === self::ADMISSION_CATEGORY_SLUG,
+                'url' => $admission_url,
+                'active' => $on_admission_page || $request->routeIs('admission.*'),
+                'children' => [
+                    ['label' => 'Admission services', 'url' => $admission_url, 'active' => $on_admission_page],
+                    ['label' => 'Course & cut-off search', 'url' => route('admission.search'), 'active' => $request->routeIs('admission.search')],
+                ],
             ],
             ['label' => 'Result Checker', 'url' => route('result-checker'), 'active' => $request->routeIs('result-checker')],
             [

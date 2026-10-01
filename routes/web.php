@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdmissionSearchController;
 use App\Http\Controllers\ConsultationBookingController;
 use App\Http\Controllers\CustomerDashboardController;
 use App\Http\Controllers\HomeController;
@@ -67,9 +68,18 @@ Route::post('book-consultation', [ConsultationBookingController::class, 'book'])
     ->middleware(['throttle:service-requests', 'throttle:order-payments'])
     ->name('book-consultation.book');
 
+// Course & cut-off search: informational only (no application or payment).
+Route::get('admission/course-search', AdmissionSearchController::class)
+    ->middleware('throttle:60,1')
+    ->name('admission.search');
+
 // Updates (blog): published posts only; drafts and scheduled posts 404.
 Route::get('updates', [UpdatesController::class, 'index'])->name('updates');
 Route::get('updates/category/{post_category:slug}', [UpdatesController::class, 'category'])->name('updates.category');
+// Draft/scheduled preview: expiring signed link (Post::previewUrl) AND a staff/admin sign-in.
+Route::get('updates/preview/{post}', [UpdatesController::class, 'preview'])
+    ->middleware(['auth', 'signed'])
+    ->name('updates.preview');
 Route::get('updates/{slug}', [UpdatesController::class, 'show'])
     ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
     ->name('updates.show');

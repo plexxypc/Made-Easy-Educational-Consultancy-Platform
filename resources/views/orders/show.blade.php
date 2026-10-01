@@ -139,7 +139,7 @@
         @if ($receipt)
             <section class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5" aria-labelledby="payment-heading">
                 <h2 id="payment-heading" class="text-lg font-bold text-emerald-900">Paid: {{ $receipt->amount_label }}</h2>
-                <p class="mt-1 text-slate-700">Receipt {{ $receipt->number }} · {{ $receipt->paid_at->format('j M Y, g:ia') }}</p>
+                <p class="mt-1 text-slate-700">Receipt {{ $receipt->number }} · {{ $receipt->paidAtLabel() }}</p>
                 <div class="mt-4 grid gap-3 sm:flex">
                     <x-public.button :href="route('orders.receipt', $order)">View receipt</x-public.button>
                     <x-public.button :href="route('orders.receipt', ['order' => $order, 'download' => 1])" variant="secondary">Download receipt</x-public.button>

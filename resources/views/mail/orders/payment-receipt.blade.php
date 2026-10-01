@@ -19,7 +19,7 @@ Thank you, we've received your payment. Your receipt is attached as a PDF, and t
 | **Service** | {{ $receipt->service_name }} |
 | **Amount** | {{ $receipt->amount_label }} |
 | **Status** | {{ $receipt->payment_status }} |
-| **Paid on** | {{ $receipt->paid_at->format('j M Y, g:ia') }} |
+| **Paid on** | {{ $receipt->paidAtLabel() }} |
 </x-mail::table>
 
 <x-mail::button :url="$receipt_url">

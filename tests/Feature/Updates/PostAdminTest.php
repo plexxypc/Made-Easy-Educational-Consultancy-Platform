@@ -215,6 +215,7 @@ class PostAdminTest extends TestCase
                 'post_category_id' => $this->category->id,
                 'body' => '<p>Apply now.</p>',
                 'featured_image_path' => $this->png('cover.png'),
+                'featured_image_alt_text' => 'Scholarship application form',
             ])
             ->call('create')
             ->assertHasNoFormErrors();

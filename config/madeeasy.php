@@ -124,12 +124,25 @@ return [
      *  - image_*: featured images and images in the post body. They are public
      *    marketing images on the "public" disk. SVG is not allowed (it can
      *    carry scripts); the type is checked from the file contents.
+     *  - preview_link_minutes: how long a draft/scheduled post preview link
+     *    works. The link also needs a staff/admin sign-in.
      */
     'blog' => [
         'timezone' => env('BLOG_TIMEZONE', 'Africa/Lagos'),
         'per_page' => 9,
         'image_max_kilobytes' => (int) env('BLOG_IMAGE_MAX_KILOBYTES', 2048),
         'image_mime_types' => ['image/jpeg', 'image/png', 'image/webp'],
+        'preview_link_minutes' => 24 * 60,
+    ],
+
+    /*
+     * Course & cut-off search (/admission/course-search, PDF section 11).
+     *  - per_page: results per page.
+     *  - import_max_lines: largest admission requirements CSV accepted at once.
+     */
+    'admission_search' => [
+        'per_page' => 20,
+        'import_max_lines' => 5000,
     ],
 
 ];

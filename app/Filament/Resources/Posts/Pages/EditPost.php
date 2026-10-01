@@ -24,6 +24,11 @@ class EditPost extends EditRecord
                 ->color('gray')
                 ->url(fn (Post $record): string => $record->publicUrl(), shouldOpenInNewTab: true)
                 ->visible(fn (Post $record): bool => $record->isPublished()),
+            Action::make('preview')
+                ->label('Preview')
+                ->color('gray')
+                ->url(fn (Post $record): string => $record->previewUrl(), shouldOpenInNewTab: true)
+                ->visible(fn (Post $record): bool => ! $record->isPublished()),
             DeleteAction::make(),
         ];
     }

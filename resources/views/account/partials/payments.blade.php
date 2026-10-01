@@ -9,7 +9,7 @@
                     <span class="block font-semibold text-slate-900">{{ $payment->order->serviceLabel() }}</span>
                     <span class="text-sm text-slate-500">
                         {{ $payment->order->display_reference }}
-                        · {{ ($payment->paid_at ?? $payment->updated_at)->format('j M Y, g:ia') }}
+                        · {{ \App\Models\Receipt::lagos_time_label($payment->paid_at ?? $payment->updated_at, 'j M Y, g:ia') }}
                         @if ($payment->receipt)
                             · Receipt {{ $payment->receipt->number }}
                         @endif

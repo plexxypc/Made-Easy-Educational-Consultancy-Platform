@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 /**
@@ -35,6 +36,7 @@ use Illuminate\Support\Str;
  * @property string|null $excerpt
  * @property string $body Rich text HTML; render with body_html().
  * @property string|null $featured_image_path Path on the public disk.
+ * @property string|null $featured_image_alt_text
  * @property string|null $meta_title
  * @property string|null $meta_description
  * @property Carbon|null $published_at
@@ -43,7 +45,7 @@ use Illuminate\Support\Str;
  */
 #[Fillable([
     'post_category_id', 'author_id', 'title', 'slug', 'excerpt', 'body', 'featured_image_path',
-    'meta_title', 'meta_description', 'published_at',
+    'featured_image_alt_text', 'meta_title', 'meta_description', 'published_at',
 ])]
 class Post extends Model implements HasRichContent
 {
@@ -240,5 +242,21 @@ class Post extends Model implements HasRichContent
     public function publicUrl(): string
     {
         return route('updates.show', ['slug' => $this->slug]);
+    }
+
+    /**
+     * Expiring signed link to see a draft or scheduled post as it will look
+     * on the site. Opening it still needs a staff/admin sign-in
+     * (UpdatesController::preview), so a leaked link shows nothing.
+     *
+     * @return string
+     */
+    public function previewUrl(): string
+    {
+        return URL::temporarySignedRoute(
+            'updates.preview',
+            now()->addMinutes((int) config('madeeasy.blog.preview_link_minutes')),
+            ['post' => $this->id],
+        );
     }
 }

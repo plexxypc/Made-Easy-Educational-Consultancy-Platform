@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Money;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -35,6 +36,13 @@ use Illuminate\Support\Carbon;
 class Receipt extends Model
 {
     /**
+     * Times on receipts are shown in Nigerian time (WAT, UTC+1, no daylight saving).
+     *
+     * @var string
+     */
+    public const TIMEZONE = 'Africa/Lagos';
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -64,6 +72,30 @@ class Receipt extends Model
     protected function amountLabel(): Attribute
     {
         return Attribute::get(fn (): string => Money::format($this->amount));
+    }
+
+    /**
+     * Payment time as printed on receipts, in Lagos time and labelled,
+     * e.g. "1 October 2026, 9:20am (Lagos time, WAT)". Stored in UTC.
+     *
+     * @return string
+     */
+    public function paidAtLabel(): string
+    {
+        return self::lagos_time_label($this->paid_at);
+    }
+
+    /**
+     * Any payment time in the receipt format (also used by Payment History so
+     * the same payment never shows two different times).
+     *
+     * @param  CarbonInterface  $moment
+     * @param  string  $format
+     * @return string
+     */
+    public static function lagos_time_label(CarbonInterface $moment, string $format = 'j F Y, g:ia'): string
+    {
+        return $moment->copy()->setTimezone(self::TIMEZONE)->format($format).' (Lagos time, WAT)';
     }
 
     /**

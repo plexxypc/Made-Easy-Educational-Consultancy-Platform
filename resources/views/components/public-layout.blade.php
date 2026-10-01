@@ -5,6 +5,7 @@
     'canonicalUrl' => null,
     'ogImage' => null,
     'refreshUrl' => null,
+    'noindex' => false,
 ])
 {{--
     Public site layout. CSS only: no JavaScript is needed to read or use any page.
@@ -26,6 +27,9 @@
         {{-- metaTitle (e.g. a post's SEO title) is used exactly as written; otherwise "Title | Business". --}}
         <title>{{ $page_title }}</title>
         <meta name="description" content="{{ $page_description }}">
+        @if ($noindex)
+            <meta name="robots" content="noindex, nofollow">
+        @endif
         @if ($canonicalUrl)
             <link rel="canonical" href="{{ $canonicalUrl }}">
             <meta property="og:type" content="article">

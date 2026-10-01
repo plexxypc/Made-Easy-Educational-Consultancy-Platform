@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Post;
 use App\Models\PostCategory;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 /**
@@ -46,6 +49,7 @@ class UpdatesController extends Controller
 
         return view('updates.show', [
             'post' => $post,
+            'is_preview' => false,
             'related_posts' => Post::query()
                 ->published()
                 ->with('category')
@@ -54,6 +58,33 @@ class UpdatesController extends Controller
                 ->newestFirst()
                 ->limit(3)
                 ->get(),
+        ]);
+    }
+
+    /**
+     * Staff/admin preview of a draft or scheduled post, from a signed link
+     * (route middleware "signed" + "auth"). The page is marked noindex. A
+     * post that is already live redirects to its public address.
+     *
+     * @param  Post  $post
+     * @return View|RedirectResponse
+     *
+     * @throws AuthorizationException If the signed-in user is not staff/admin.
+     */
+    public function preview(Post $post): View|RedirectResponse
+    {
+        Gate::authorize('view', $post);
+
+        if ($post->isPublished()) {
+            return redirect()->to($post->publicUrl());
+        }
+
+        $post->load('category');
+
+        return view('updates.show', [
+            'post' => $post,
+            'related_posts' => collect(),
+            'is_preview' => true,
         ]);
     }
 

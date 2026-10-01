@@ -131,6 +131,13 @@ docker compose exec app php artisan db:seed --force    # production
   (JAMB News … NIN/JAMB Information). It only creates missing ones.
 - `TestUsersSeeder` seeds the staff/admin/customer test accounts above. It is
   skipped in production.
+- `AdmissionSampleDataSeeder` seeds **SAMPLE** course search data: 11 real
+  institutions, 11 courses and 49 cut-off marks. **The cut-off marks and credit
+  counts are illustrative, not official.** Skipped in production. Before
+  go-live, clear it (Course search → Cut-off marks → select all → Delete, as
+  an admin; then delete the institutions and courses) and import the client's
+  dataset. To show the sample on another environment on purpose, run
+  `php artisan db:seed --class=AdmissionSampleDataSeeder`.
 
 ## Roles
 
@@ -196,6 +203,8 @@ They use the `<x-public-layout>` component. The nav comes from
 | `/updates` | **Updates** (blog): published posts, newest first, 9 per page, with category links |
 | `/updates/category/{slug}` | Published posts in one category |
 | `/updates/{slug}` | One published post, with its meta title and description as the page `<title>` and `<meta>` |
+| `/updates/preview/{id}` | Staff/admin preview of a draft or scheduled post: expiring signed link (24 hours) **and** a staff/admin sign-in; `noindex` |
+| `/admission/course-search` | **Course & cut-off search** (PDF section 11): JAMB score, O'Level credits, course, state, all optional; informational, links to Admission Guidance |
 | `/about`, `/contact` | About (placeholder copy) and Contact |
 | `/track` | **Track your request**: reference plus the email or phone used |
 | `/track/{reference}` | Order page: status, answers, documents, messages, **Pay now**, receipt and the needs-action response form |
@@ -305,7 +314,9 @@ with a total above ₦0. A quote order becomes payable only after **Set Total**
   rendered by `App\Actions\Receipts\RenderReceiptPdf` (dompdf, template
   `resources/views/receipts/pdf.blade.php`). The same PDF is served from the
   order page and dashboard. dompdf runs with remote files, PHP and JavaScript
-  off.
+  off. Payment times on receipts (PDF, email, order page, Payment History)
+  are shown in Lagos time and labelled "(Lagos time, WAT)"
+  (`Receipt::paidAtLabel()`); they are stored in UTC.
 - Anything else is **not applied**. The payment keeps a `review_reason`, the
   event is logged at error level, and staff get a `PaymentNeedsReview`
   notification (plus email when `EMAIL_STAFF_ON_PAYMENT_REVIEW=true`). The order
@@ -403,7 +414,9 @@ With `LOG_CHANNEL=stderr` and `MAIL_MAILER=log`, emails appear in
 | Administration: Access log (documents & PINs) | admin | Read-only; search by staff member or order reference |
 | Consultations: Bookings | staff, admin | Filter by date and status; add meeting link, reschedule, mark completed / no-show, cancel (customer emailed, except completed / no-show) |
 | Consultations: Availability | admin | Add one slot or a weekly pattern; cancel a slot (booked customers emailed); delete never-booked slots |
-| Updates: Posts | staff write, admin publishes | Rich text, featured image, category, auto-slug, SEO fields, publish date/time; list shows Published / Scheduled / Draft |
+| Updates: Posts | staff write, admin publishes | Rich text, featured image with alt text, category, auto-slug, SEO fields, publish date/time; list shows Published / Scheduled / Draft; **Preview** on unpublished posts |
+| Course search: Cut-off marks | staff, admin | Import CSV (all or nothing), download template, add/edit single rows; bulk delete admin only |
+| Course search: Institutions / Courses | staff, admin | Plain CRUD; delete only once nothing uses them |
 
 **Updates posts** (`App\Models\Post`, `PostPolicy`):
 
@@ -423,7 +436,41 @@ With `LOG_CHANNEL=stderr` and `MAIL_MAILER=log`, emails appear in
   under `posts/`. They must be JPEG, PNG or WebP, up to
   `BLOG_IMAGE_MAX_KILOBYTES` (default 2 MB), with the type checked from the
   contents. SVG is refused. A replaced or deleted featured image is removed
-  from disk.
+  from disk. A featured image needs alt text, which is used on the post page.
+
+**Course search data** (`Institution`, `Course`, `AdmissionRequirement`).
+CSV import (`App\Actions\Admissions\ImportAdmissionRequirements`):
+
+- **Header row required.** Required columns: `institution`, `course`,
+  `cut_off_mark` (1–400) and `olevel_credits_required` (1–9). Optional columns:
+  `type` (University / Polytechnic / College of Education), `ownership`
+  (Federal / State / Private) and `state` (a state name, or FCT).
+- Columns can be in any order, and common spellings such as "Cut-off mark"
+  are accepted. Unknown columns are refused.
+- Names containing a comma must be in double quotes. Download the template
+  from the screen for an example.
+- **All or nothing.** Any bad line rejects the file, and the problems are
+  listed by line number (line 1 is the header).
+- Institutions and courses are **matched by name**, ignoring case and extra
+  spaces, and are created if new. Abbreviations are not matched: "UNILAG" is
+  a different institution from "University of Lagos".
+- An institution and course that are already listed get the new cut-off mark
+  and credits. The same pair twice in one file is an error.
+- A new institution with no type, ownership or state is still created, and the
+  result lists it so someone can complete it. Until then it is left out of
+  searches by state.
+- Blank details on an existing institution are filled in from the file.
+  Details that contradict what is stored are an error.
+
+**Search matching** (`AdmissionRequirement::matching()`):
+
+- The **cut-off mark** must be at or below the student's score. Meeting it
+  exactly counts.
+- The **credits required** must be at or below the student's credits.
+- The **course name** must contain the typed text, ignoring case.
+- The **institution** must be in the chosen state.
+- A blank field is not checked. Results are sorted by cut-off mark, highest
+  first.
 
 **PIN uploads** (`App\Actions\Pins\ImportPinBatch`) are all-or-nothing. Any
 malformed line, duplicate within the batch, or PIN already in stock (for any

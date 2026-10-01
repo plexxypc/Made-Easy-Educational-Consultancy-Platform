@@ -10,20 +10,42 @@
             </span>
         </a>
 
-        {{-- Desktop navigation --}}
+        {{-- Desktop navigation. Sub-links open on hover or keyboard focus (CSS only); the parent link still works on its own. --}}
         <nav aria-label="Main" class="hidden xl:block">
             <ul class="flex items-center gap-1">
                 @foreach ($nav_items as $item)
-                    <li>
+                    <li @class(['group relative' => ! empty($item['children'])])>
                         <a
                             href="{{ $item['url'] }}"
-                            @if ($item['active']) aria-current="page" @endif
+                            @if ($item['active'] && empty($item['children'])) aria-current="page" @endif
                             @class([
                                 'flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold transition',
                                 'bg-brand-50 text-brand-800' => $item['active'],
                                 'text-slate-700 hover:bg-slate-100 hover:text-slate-900' => ! $item['active'],
                             ])
-                        >{{ $item['label'] }}</a>
+                        >
+                            {{ $item['label'] }}
+                            @if (! empty($item['children']))
+                                <svg class="ml-1 h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                            @endif
+                        </a>
+                        @if (! empty($item['children']))
+                            <ul class="invisible absolute left-0 top-full z-50 w-64 rounded-xl border border-slate-200 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                                @foreach ($item['children'] as $child)
+                                    <li>
+                                        <a
+                                            href="{{ $child['url'] }}"
+                                            @if ($child['active']) aria-current="page" @endif
+                                            @class([
+                                                'flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold',
+                                                'bg-brand-50 text-brand-800' => $child['active'],
+                                                'text-slate-700 hover:bg-slate-100' => ! $child['active'],
+                                            ])
+                                        >{{ $child['label'] }}</a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </li>
                 @endforeach
             </ul>
@@ -50,20 +72,22 @@
                     </svg>
                     Menu
                 </summary>
-                <nav aria-label="Main" class="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <nav aria-label="Main" class="absolute right-0 mt-2 max-h-[calc(100vh-6rem)] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                     <ul class="flex flex-col">
                         @foreach ($nav_items as $item)
-                            <li>
-                                <a
-                                    href="{{ $item['url'] }}"
-                                    @if ($item['active']) aria-current="page" @endif
-                                    @class([
-                                        'flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold',
-                                        'bg-brand-50 text-brand-800' => $item['active'],
-                                        'text-slate-800 hover:bg-slate-100' => ! $item['active'],
-                                    ])
-                                >{{ $item['label'] }}</a>
-                            </li>
+                            @foreach (empty($item['children']) ? [$item] : $item['children'] as $link)
+                                <li>
+                                    <a
+                                        href="{{ $link['url'] }}"
+                                        @if ($link['active']) aria-current="page" @endif
+                                        @class([
+                                            'flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold',
+                                            'bg-brand-50 text-brand-800' => $link['active'],
+                                            'text-slate-800 hover:bg-slate-100' => ! $link['active'],
+                                        ])
+                                    >{{ empty($item['children']) ? $link['label'] : $item['label'].': '.$link['label'] }}</a>
+                                </li>
+                            @endforeach
                         @endforeach
                         <li class="mt-1 border-t border-slate-100 pt-1 sm:hidden">
                             @auth

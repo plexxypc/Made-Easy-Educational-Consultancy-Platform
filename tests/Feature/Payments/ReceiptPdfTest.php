@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Receipt;
 use App\Models\Service;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -62,7 +63,7 @@ class ReceiptPdfTest extends TestCase
         foreach ([
             'Payment receipt', $ada_receipt->number, $ada_order->reference, $ada_receipt->payment_reference,
             'Ada Obi', 'ada@example.com', 'Birth Certificate', '₦15,000.00', 'Successful',
-            $ada_receipt->paid_at->format('j F Y'),
+            $ada_receipt->paidAtLabel(),
         ] as $expected) {
             $this->assertStringContainsString($expected, $ada_text);
         }
@@ -78,6 +79,33 @@ class ReceiptPdfTest extends TestCase
 
         // Same document as the receipt link on the order page.
         $this->assertSame($ada_text, $this->pdf_text(app(RenderReceiptPdf::class)->handle($ada_receipt)));
+    }
+
+    /**
+     * The payment time is printed in Lagos time and labelled as such, on the
+     * PDF, in the email and on the order page. 23:30 UTC on 30 September is
+     * already 1 October in Lagos.
+     *
+     * @return void
+     */
+    public function test_receipt_time_is_shown_in_lagos_time_and_labelled(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-30 23:30:00', 'UTC'));
+        $order = $this->guest_order('Ada Obi', 'ada@example.com', 'Birth Certificate', 1_500_000);
+        $this->pay_with_webhook($this->initiated_payment_for($order))->assertOk();
+
+        $receipt = $order->refresh()->receipt;
+        $expected = '1 October 2026, 12:30am (Lagos time, WAT)';
+        $this->assertSame($expected, $receipt->paidAtLabel());
+
+        $pdf_text = $this->pdf_text($this->receipt_attachment('ada@example.com', $receipt)->getBody());
+        $this->assertStringContainsString($expected, $pdf_text);
+        $this->assertStringNotContainsString('30 September', $pdf_text);
+
+        /** @var SentMessage $sent */
+        $sent = app('mailer')->getSymfonyTransport()->messages()
+            ->first(fn (SentMessage $sent): bool => str_starts_with((string) $sent->getOriginalMessage()->getSubject(), 'Payment receipt'));
+        $this->assertStringContainsString($expected, (string) $sent->getOriginalMessage()->getHtmlBody());
     }
 
     /**

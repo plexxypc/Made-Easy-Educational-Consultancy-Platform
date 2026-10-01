@@ -22,5 +22,10 @@ class DatabaseSeeder extends Seeder
             PostCategorySeeder::class,
             TestUsersSeeder::class, // skipped in production
         ]);
+
+        // SAMPLE cut-off marks for the course search; never seeded into production by default.
+        if (! app()->isProduction()) {
+            $this->call(AdmissionSampleDataSeeder::class);
+        }
     }
 }

@@ -1,10 +1,24 @@
-{{-- One published post. <title> and <meta name="description"> come from the post's SEO fields (Post::seoTitle / seoDescription). --}}
+{{--
+    One post. <title> and <meta name="description"> come from the post's SEO fields (Post::seoTitle / seoDescription).
+    $is_preview: staff/admin preview of a draft or scheduled post (UpdatesController::preview): noindex, no canonical, banner on top.
+--}}
 <x-public-layout
     :meta-title="$post->seoTitle()"
     :description="$post->seoDescription()"
-    :canonical-url="$post->publicUrl()"
+    :canonical-url="$is_preview ? null : $post->publicUrl()"
     :og-image="$post->featuredImageUrl()"
+    :noindex="$is_preview"
 >
+    @if ($is_preview)
+        <div class="border-b border-amber-300 bg-amber-50" role="status">
+            <p class="mx-auto max-w-3xl px-4 py-3 text-sm font-semibold text-amber-900 sm:px-6">
+                {{ $post->published_at
+                    ? 'Preview only. This post is scheduled and goes live on '.$post->published_at->timezone((string) config('madeeasy.blog.timezone'))->format('j M Y, g:ia').' (Lagos time).'
+                    : 'Preview only. This post is a draft and is not visible to the public.' }}
+            </p>
+        </div>
+    @endif
+
     <article class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <nav aria-label="Breadcrumb" class="text-sm text-slate-500">
             <a href="{{ route('updates') }}" class="hover:underline">Updates</a>
@@ -14,12 +28,16 @@
 
         <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">{{ $post->title }}</h1>
         <p class="mt-3 text-sm text-slate-500">
-            Published <time datetime="{{ $post->published_at->toAtomString() }}">{{ $post->publishedOnLabel() }}</time>
+            @if ($post->published_at)
+                Published <time datetime="{{ $post->published_at->toAtomString() }}">{{ $post->publishedOnLabel() }}</time>
+            @else
+                Not published yet
+            @endif
             in <a href="{{ $post->category->publicUrl() }}" class="font-semibold text-brand-700 hover:underline">{{ $post->category->name }}</a>
         </p>
 
         @if ($post->featuredImageUrl())
-            <img src="{{ $post->featuredImageUrl() }}" alt="" class="mt-6 aspect-[16/9] w-full rounded-2xl object-cover">
+            <img src="{{ $post->featuredImageUrl() }}" alt="{{ $post->featured_image_alt_text ?? '' }}" class="mt-6 aspect-[16/9] w-full rounded-2xl object-cover">
         @endif
 
         {{-- Sanitised by Filament's rich content renderer (no scripts, event handlers or unsafe URLs). --}}

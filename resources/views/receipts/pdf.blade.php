@@ -40,7 +40,7 @@
 
     <table class="details">
         <tr><th>Receipt number</th><td>{{ $receipt->number }}</td></tr>
-        <tr><th>Paid on</th><td>{{ $receipt->paid_at->format('j F Y, g:ia') }}</td></tr>
+        <tr><th>Paid on</th><td>{{ $receipt->paidAtLabel() }}</td></tr>
         <tr><th>Order reference</th><td>{{ $receipt->displayOrderReference() }}</td></tr>
         <tr><th>Payment reference</th><td>{{ $receipt->payment_reference }}</td></tr>
         <tr><th>Customer</th><td>{{ $receipt->customer_name }}</td></tr>

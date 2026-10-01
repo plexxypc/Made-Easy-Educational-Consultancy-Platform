@@ -20,6 +20,11 @@
                 </div>
                 <x-public.button :href="$admission_guidance_url" variant="accent">I Need Admission Guidance</x-public.button>
             </div>
+            <p class="mt-4 text-slate-700">
+                Checking your chances first?
+                <a href="{{ route('admission.search') }}" class="font-semibold text-brand-700 underline">Search courses and cut-off marks</a>
+                by JAMB score, O'Level credits and state.
+            </p>
         @endif
 
         @if ($services->isEmpty())

@@ -12,6 +12,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Gate;
 
@@ -100,6 +101,11 @@ class PostForm
                                     ->acceptedFileTypes($image_types)
                                     ->maxSize($image_max_kilobytes)
                                     ->helperText('JPEG, PNG or WebP, up to '.intdiv($image_max_kilobytes, 1024).' MB. Shown on the updates list and at the top of the post.'),
+                                TextInput::make('featured_image_alt_text')
+                                    ->label('Image description (alt text)')
+                                    ->maxLength(150)
+                                    ->required(fn (Get $get): bool => filled($get('featured_image_path')))
+                                    ->helperText('Required with an image. Describe what it shows for people using screen readers, e.g. "Students writing the UTME in a CBT centre".'),
                             ]),
                         Section::make('Search engines')
                             ->description('Optional. Defaults to the title and summary.')

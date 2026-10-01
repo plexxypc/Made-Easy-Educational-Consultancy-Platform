@@ -7,6 +7,7 @@ use App\Enums\FulfilmentType;
 use App\Exceptions\BusinessRuleException;
 use App\Exceptions\PinImportRejected;
 use App\Filament\Resources\ResultCheckerPins\ResultCheckerPinResource;
+use App\Filament\Support\ImportProblemList;
 use App\Filament\Widgets\PinStockOverview;
 use App\Models\Service;
 use Filament\Actions\Action;
@@ -16,8 +17,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ListResultCheckerPins extends ListRecords
@@ -99,7 +98,7 @@ class ListResultCheckerPins extends ListRecords
                     Notification::make()
                         ->danger()
                         ->title($exception->getMessage())
-                        ->body(self::problem_list($exception->problems))
+                        ->body(ImportProblemList::html($exception->problems))
                         ->persistent()
                         ->send();
 
@@ -142,23 +141,5 @@ class ListResultCheckerPins extends ListRecords
         }
 
         return $lines === [] ? null : implode(' ', $lines);
-    }
-
-    /**
-     * First problems of a rejected batch, one per line (the rest summarised).
-     *
-     * @param  array<int, string>  $problems
-     * @return HtmlString
-     */
-    private static function problem_list(array $problems): HtmlString
-    {
-        $lines = array_map('e', array_slice($problems, 0, 10));
-        $more = count($problems) - count($lines);
-
-        if ($more > 0) {
-            $lines[] = e('…and '.Str::plural('more line', $more, true).'.');
-        }
-
-        return new HtmlString(implode('<br>', $lines));
     }
 }
