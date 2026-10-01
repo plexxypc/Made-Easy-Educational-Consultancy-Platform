@@ -85,4 +85,27 @@ class AuthenticationTest extends TestCase
 
         $this->assertGuest();
     }
+
+    /**
+     * Signed-in customers can log out from the public header (My Requests and
+     * every public page), which links "My account" to the profile page.
+     *
+     * @return void
+     */
+    public function test_customers_can_log_out_from_the_public_header(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $this->get(route('my-requests'))
+            ->assertOk()
+            ->assertSee('action="'.route('logout').'"', false)
+            ->assertSee('Log out')
+            ->assertSee('href="'.route('profile').'"', false);
+
+        $this->post(route('logout'))->assertRedirect(route('home'));
+        $this->assertGuest();
+
+        $this->get(route('home'))->assertDontSee('action="'.route('logout').'"', false);
+        $this->post(route('logout'))->assertRedirect(route('login'));
+    }
 }

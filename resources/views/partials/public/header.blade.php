@@ -58,7 +58,11 @@
                     <a href="{{ url('/admin') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-ink/80 hover:bg-ink/5 sm:flex">Back office</a>
                 @endrole
                 <a href="{{ route('my-requests') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-ink/80 hover:bg-ink/5 sm:flex">My Requests</a>
-                <a href="{{ route('dashboard') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg border-2 border-ink bg-white px-4 text-sm font-semibold text-ink hover:bg-surface sm:flex">My account</a>
+                <a href="{{ route('profile') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg border-2 border-ink bg-white px-4 text-sm font-semibold text-ink hover:bg-surface sm:flex">My account</a>
+                <form method="POST" action="{{ route('logout') }}" class="hidden sm:block">
+                    @csrf
+                    <button type="submit" class="flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-ink/80 hover:bg-ink/5 hover:text-ink">Log out</button>
+                </form>
             @else
                 <a href="{{ route('orders.track') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-ink/80 hover:bg-ink/5 sm:flex">Track request</a>
                 <a href="{{ route('login') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg border-2 border-ink bg-white px-4 text-sm font-semibold text-ink hover:bg-surface sm:flex">Log in</a>
@@ -93,7 +97,11 @@
                         <li class="mt-1 border-t border-ink/10 pt-1 sm:hidden">
                             @auth
                                 <a href="{{ route('my-requests') }}" class="flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold text-ink hover:bg-ink/5">My Requests</a>
-                                <a href="{{ route('dashboard') }}" class="flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold text-ink hover:bg-ink/5">My account</a>
+                                <a href="{{ route('profile') }}" class="flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold text-ink hover:bg-ink/5">My account</a>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="flex min-h-[48px] w-full items-center rounded-xl px-4 text-left text-base font-semibold text-ink hover:bg-ink/5">Log out</button>
+                                </form>
                             @else
                                 <a href="{{ route('orders.track') }}" class="flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold text-ink hover:bg-ink/5">Track your request</a>
                                 <a href="{{ route('login') }}" class="flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold text-ink hover:bg-ink/5">Log in</a>
