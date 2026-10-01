@@ -46,14 +46,55 @@ return [
     ],
 
     /*
-     * Order tracking lookups ("Track your request"): attempts per minute per IP,
-     * and per hour per reference number (slows guessing from many IPs).
+     * Order tracking ("Track your request").
+     * A guest who looked an order up must do so again after this long without using the page.
      */
     'order_lookups' => [
-        'per_minute_per_ip' => 5,
-        'per_hour_per_reference' => 10,
-        // A guest who looked an order up must do so again after this long without using the page.
         'guest_idle_minutes' => (int) env('GUEST_TRACKING_IDLE_MINUTES', 30),
+    ],
+
+    /*
+     * Security headers (App\Http\Middleware\SecurityHeaders; Caddy sends the same).
+     *  - hsts_max_age: seconds browsers must use HTTPS only. 0 = no HSTS.
+     *    Leave at 0 until HTTPS works on the real domain, then 31536000.
+     */
+    'security' => [
+        'hsts_max_age' => (int) env('HSTS_MAX_AGE', 0),
+    ],
+
+    /*
+     * EVERY public form's rate limit, in one place: [attempts, per minutes].
+     * The named route limiters (AppServiceProvider) and the Livewire auth
+     * forms (App\Support\FormThrottle) read these; nothing else hardcodes one.
+     *
+     * The scheme, so a new form can pick the right row:
+     *  - A form that creates something or sends an email: 5 a minute.
+     *  - Guessable lookups: 5 a minute per IP, plus a slower cap on the
+     *    thing being guessed (an order reference, an email + IP for login).
+     *  - Payment steps: 10 a minute (the Paystack return page refreshes itself).
+     *  - Read-only search: 60 a minute.
+     * Keyed by IP for guests, by user id for signed-in-only forms.
+     * The Paystack webhook is deliberately NOT limited: it is authenticated by
+     * its signature, and Paystack retries anything that fails.
+     */
+    'rate_limits' => [
+        // Route middleware (throttle:<name>), per IP unless noted.
+        'service-requests' => [5, 1],           // service request form; also "Buy Result Checker" and "Book a consultation"
+        'order-lookups' => [5, 1],              // "Track your request" form
+        'order-lookups-per-reference' => [10, 60], // same form, per reference number from any IP
+        'order-responses' => [5, 1],            // "needs action" reply on a tracked order
+        'testimonials' => [5, 1],               // testimonial submission
+        'order-payments' => [10, 1],            // "Pay now" and the Paystack return page
+        'course-search' => [60, 1],             // /admission/course-search
+        'account-claims' => [5, 1],             // My Requests: claim / dismiss / restore (per user)
+        'verification-links' => [6, 1],         // email verification link (per user; Laravel's default)
+        // Livewire auth forms (FormThrottle).
+        'logins' => [5, 1],                     // FAILED sign-ins per email + IP (cleared on success)
+        'registrations' => [5, 1],
+        'password-reset-links' => [5, 1],       // also 1 email per address per minute (config/auth.php)
+        'password-resets' => [5, 1],
+        'verification-emails' => [5, 1],        // "resend verification email" (per user)
+        'password-checks' => [5, 1],            // confirm password, change password (per user)
     ],
 
     /*

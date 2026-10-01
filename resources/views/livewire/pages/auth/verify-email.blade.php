@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Actions\Logout;
+use App\Support\FormThrottle;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Layout;
@@ -18,6 +19,8 @@ new #[Layout('layouts.guest')] class extends Component
 
             return;
         }
+
+        FormThrottle::hit('verification-emails', (string) Auth::id(), 'verification');
 
         Auth::user()->sendEmailVerificationNotification();
 
@@ -45,6 +48,8 @@ new #[Layout('layouts.guest')] class extends Component
             {{ __('A new verification link has been sent to the email address you provided during registration.') }}
         </div>
     @endif
+
+    <x-input-error :messages="$errors->get('verification')" class="mb-4" />
 
     <div class="mt-4 flex items-center justify-between">
         <x-primary-button wire:click="sendVerification">

@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\FormThrottle;
 use Illuminate\Support\Facades\Password;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -13,6 +14,8 @@ new #[Layout('layouts.guest')] class extends Component
      */
     public function sendPasswordResetLink(): void
     {
+        FormThrottle::hit('password-reset-links', (string) request()->ip(), 'email');
+
         $this->validate([
             'email' => ['required', 'string', 'email'],
         ]);

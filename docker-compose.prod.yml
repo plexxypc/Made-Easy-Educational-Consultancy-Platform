@@ -1,0 +1,170 @@
+# PRODUCTION overrides for the Hostinger KVM 2 VPS (2 vCPU, 8 GB RAM).
+# docker-compose.yml is unchanged and is still what local development uses.
+#
+# On the VPS, put this line in .env so every `docker compose` command picks
+# up both files without typing -f twice (do NOT add it to a local .env):
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+#
+# What this adds or changes:
+#  - restart: always on every long-running service, so Docker restarts a
+#    crashed container and starts everything again after a reboot.
+#  - CPU/memory caps sized for 8 GB / 2 cores (totals below), so one runaway
+#    process can't starve the database.
+#  - Log rotation for every container (json-file, 5 x 10 MB each).
+#  - Caddy uses docker/caddy/Caddyfile.prod: the real domain, no localhost
+#    fallback, HSTS controlled by HSTS_MAX_AGE.
+#  - app's healthcheck asks Laravel's /up (PHP + database), not just php-fpm.
+#  - "scheduler": runs `php artisan schedule:work`, replacing the host cron
+#    entry the README used to describe.
+#  - "backup": nightly encrypted database + files backup, copied off-server.
+#  - "backup-restore": one-off container for restores (never runs by itself).
+#
+# Memory caps: app 1.5 GB + worker 512 MB + scheduler 256 MB + db 2 GB +
+# caddy 256 MB + backup 512 MB = ~5 GB, leaving ~3 GB for the OS, Docker,
+# image builds and the page cache Postgres relies on.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app-production: &app-production
+  restart: always
+  logging: *logging
+
+services:
+  app:
+    <<: *app-production
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1536M
+    healthcheck:
+      # A real request for /up through php-fpm: fails if Laravel or Postgres is down.
+      test: ["CMD-SHELL", "SCRIPT_NAME=/index.php SCRIPT_FILENAME=/var/www/html/public/index.php REQUEST_URI=/up REQUEST_METHOD=GET SERVER_NAME=localhost HTTP_HOST=localhost HTTPS=on cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q 'Application up'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    <<: *app-production
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  scheduler:
+    <<: *app-production
+    image: madeeasy-app:latest
+    pull_policy: never
+    env_file: .env
+    command: ["php", "artisan", "schedule:work"]
+    stop_grace_period: 30s
+    volumes:
+      - app_storage:/var/www/html/storage
+      - public_media:/var/www/html/storage/app/public
+    depends_on:
+      app:
+        condition: service_started
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  caddy:
+    restart: always
+    logging: *logging
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.prod", "--adapter", "caddyfile"]
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS must be the real domain in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set in .env}
+      HSTS_MAX_AGE: ${HSTS_MAX_AGE:-0}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  db:
+    restart: always
+    logging: *logging
+    # Tuned for a 2 GB cap: shared_buffers ~25%, the rest left to the OS cache.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=60
+    shm_size: 256m
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 2048M
+
+  backup:
+    build:
+      context: .
+      target: backup
+    image: madeeasy-backup:latest
+    restart: always
+    logging: *logging
+    env_file: .env
+    environment:
+      DB_HOST: db
+      BACKUP_AGE_RECIPIENTS: ${BACKUP_AGE_RECIPIENTS:?BACKUP_AGE_RECIPIENTS (age public key) must be set in .env}
+    volumes:
+      - backups:/backups
+      - app_storage:/data/app_storage:ro
+      - public_media:/data/public_media:ro
+      # SCP target only: id_ed25519 + known_hosts for the backup host (README).
+      - ${BACKUP_SSH_DIR:-./backup-ssh}:/backup-ssh:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  # Restores only (README, "Restoring from a backup"):
+  #   docker compose run --rm backup-restore backup-restore <stamp> /backups/restore/key.txt [--live]
+  backup-restore:
+    image: madeeasy-backup:latest
+    pull_policy: never
+    profiles: ["restore"]
+    env_file: .env
+    environment:
+      DB_HOST: db
+    command: ["true"]
+    volumes:
+      - backups:/backups
+      - app_storage:/data/app_storage
+      - public_media:/data/public_media
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
+volumes:
+  backups:

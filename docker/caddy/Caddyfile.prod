@@ -1,0 +1,70 @@
+# Caddy config for PRODUCTION (docker-compose.prod.yml selects it).
+# Local development keeps using docker/caddy/Caddyfile.
+#
+# SITE_ADDRESS must be the real domain(s), e.g.
+#   SITE_ADDRESS=madeeasy.example.com, www.madeeasy.example.com
+# There is no localhost fallback here: docker-compose.prod.yml refuses to start
+# without SITE_ADDRESS and ACME_EMAIL. Caddy gets and renews Let's Encrypt
+# certificates itself once DNS points at the VPS and ports 80/443 are open.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_ADDRESS} {
+	root * /var/www/html/public
+
+	encode zstd gzip
+
+	# The same set App\Http\Middleware\SecurityHeaders sends, here so static
+	# files (built assets, Updates images) get them too. Deleting a header
+	# defers the whole block, so these replace Laravel's copies rather than
+	# doubling them.
+	#
+	# HSTS: HSTS_MAX_AGE=0 (the default) sends "max-age=0", i.e. no HSTS.
+	# Raise it only once HTTPS is confirmed working (GO-LIVE.md). Not
+	# includeSubDomains: other subdomains (mail, a Hostinger panel) may not
+	# have HTTPS.
+	header {
+		Strict-Transport-Security "max-age={$HSTS_MAX_AGE:0}"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+		-X-Powered-By
+	}
+
+	# Defence in depth: this image only contains public/, so none of these
+	# exist here anyway, but answer 404 before PHP is ever asked.
+	@never_served {
+		# Dotfiles and dot-directories anywhere: .env, .git/, .htaccess ...
+		path */.*
+		path /vendor /vendor/* /node_modules /node_modules/*
+		path /app/* /bootstrap/* /config/* /database/* /resources/* /routes/* /tests/* /docker/*
+		path /artisan /composer.json /composer.lock /package.json /package-lock.json /phpunit.xml
+		path *.sql *.dump *.age *.log *.bak
+		# storage/ itself (private uploads, logs, sessions). /storage/* below
+		# only ever maps to the public_media volume.
+		path /storage/app/* /storage/framework/* /storage/logs/*
+	}
+
+	route {
+		respond @never_served 404
+
+		# Public disk (Updates images) from its own read-only volume. Private
+		# uploads live in app_storage, which Caddy never mounts.
+		handle_path /storage/* {
+			root * /srv/public-media
+			header Cache-Control "public, max-age=604800"
+			file_server
+		}
+
+		php_fastcgi app:9000
+		file_server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

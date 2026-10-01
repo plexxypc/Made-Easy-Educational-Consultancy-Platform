@@ -1,9 +1,11 @@
 # Made Easy Educational Consultancy Platform
 
-Laravel 13 platform for Made Easy Educational Consultancy. This repository is
-currently the **infrastructure skeleton only**: auth, roles, admin panel and a
-deployable Docker stack. There are no business features (services, orders,
-payments) yet.
+Laravel 13 platform for Made Easy Educational Consultancy: public site,
+service requests, Paystack payments, result checker PINs, consultation
+bookings, Updates (blog), course search, and the Filament back office.
+
+**Launching?** Follow [GO-LIVE.md](GO-LIVE.md) step by step. The
+[Production](#production-hostinger-kvm-2) section below explains each step.
 
 | Layer        | Choice                                                     |
 | ------------ | ---------------------------------------------------------- |
@@ -17,7 +19,10 @@ payments) yet.
 
 ## Docker services
 
-`docker-compose.yml` defines four services, used unchanged locally and in production:
+`docker-compose.yml` defines four services. Production adds
+`docker-compose.prod.yml` on top (restart policies, limits, log rotation, the
+scheduler and backups; see [Production](#production-hostinger-kvm-2)), and
+local development never uses it:
 
 - **app**: PHP-FPM running Laravel (image built from `Dockerfile`, target `app`).
 - **worker**: the same image running `php artisan queue:work database`.
@@ -129,9 +134,13 @@ docker compose exec app php artisan db:seed --force    # production
   have price 0.
 - `PostCategorySeeder` seeds the 12 Updates categories from PDF section 10
   (JAMB News … NIN/JAMB Information). It only creates missing ones.
-- `FaqSeeder` seeds 7 FAQs for PDF section 13. **The wording is drafted**
-  (the PDF text wasn't available), so review it in Website → FAQ before
-  go-live. It only adds questions that are missing, so edits are kept.
+- `FaqSeeder` seeds the 7 FAQs for PDF section 13. **Pending:** until the
+  official wording is pasted into `database/data/faqs_section_13.php`, it
+  seeds drafted stand-ins. Once that file holds the seven questions, re-run
+  `php artisan db:seed --class=FaqSeeder --force`: it adds the official
+  questions, removes drafted ones nobody edited, and names any edited draft so
+  it can be reviewed in Website → FAQ (`App\Actions\Faqs\InstallOfficialFaqs`).
+  It never overwrites an answer an admin changed.
 - `TestUsersSeeder` seeds the staff/admin/customer test accounts above. It is
   skipped in production.
 - `AdmissionSampleDataSeeder` seeds **SAMPLE** course search data: 11 real
@@ -270,7 +279,7 @@ set in the admin under Services, then "Information required from the customer".
   emails already confirm the order). The reference is a
   random code such as `ME-7K2QXD` (`Order::generateReference()`, Crockford
   base32, unique). Orders created before this change keep their old numeric
-  reference (shown as `#12`). Submissions are rate-limited to 5 per minute per IP.
+  reference (shown as `#12`). Submissions are rate-limited (see [Rate limits](#rate-limits)).
 - Instant services (result checkers), consultation services and inactive
   services can't be requested through this form; result checkers are bought on
   `/result-checker` and consultations booked on `/book-consultation`.
@@ -288,8 +297,8 @@ a wrong contact give the same error.
   spaces, and O/I/L are read as 0/1/1.
 - Guests see document filenames only. The owner also gets download links
   through the existing `/documents/{id}` route.
-- Lookups are rate-limited to 5 per minute per IP and 10 per hour per reference
-  (`config/madeeasy.php`, `order_lookups`). Responses are limited to 5 per minute per IP.
+- Lookups are rate-limited per IP and per reference; responses per IP (see
+  [Rate limits](#rate-limits)).
 
 **Responding to "Needs action".** The order page shows the staff note and a
 form for a message and/or up to 5 documents. `App\Actions\Orders\RespondToNeedsAction`:
@@ -347,7 +356,8 @@ priced above ₦0 (`Service::resultCheckersForSale()`).
   in and no second checkout. Guests keep session access to the order, as with requests.
 - **Stock.** `result_checker_pins` holds each PIN and optional serial number.
   Both use Laravel's `encrypted` cast; `pin_hash` (an HMAC keyed with `APP_KEY`)
-  enforces uniqueness across all services. Status: `available` → `allocated` →
+  enforces uniqueness across all services. Changing `APP_KEY` therefore needs
+  `php artisan pins:rekey` (see [Rotating APP_KEY](#rotating-app_key)). Status: `available` → `allocated` →
   `revealed` (shown as "Delivered": emailed and visible to the customer).
 - **Allocation.** `ConfirmPaystackCharge` fires `App\Events\OrderPaid` after it
   applies a charge. The queued listener `AllocateResultCheckerPins` runs
@@ -543,14 +553,11 @@ decision.
   continuously and is restarted by Docker if it exits (`--max-time=3600`
   recycles it hourly). Failed jobs land in `failed_jobs`
   (`php artisan queue:failed`, `queue:retry all`).
-- Scheduled tasks are defined in `routes/console.php`. Add this **host** cron
-  entry (`crontab -e` on the VPS) to trigger them every minute:
-
-  ```cron
-  * * * * * cd /opt/madeeasy && docker compose exec -T app php artisan schedule:run >> /dev/null 2>&1
-  ```
-
-  Check with `docker compose exec app php artisan schedule:list`.
+- Scheduled tasks are defined in `routes/console.php`. In production the
+  **scheduler** service (`docker-compose.prod.yml`) runs `php artisan
+  schedule:work`, so no host cron entry is needed. Don't add one as well, or
+  every task runs twice. Locally, run `docker compose exec app php artisan
+  schedule:run` by hand when you need to. Check with `php artisan schedule:list`.
 - `consultations:remind-missing-meeting-links` runs every 15 minutes. It sends
   staff and admins one notification (database and mail) for each confirmed
   online or Google Meet booking that starts within 24 hours and has no meeting
@@ -595,56 +602,189 @@ run is using the "madeeasy_test" database; waiting…" and starts when the first
 finishes (it gives up after 20 minutes). To run in parallel, give each run its
 own `DB_DATABASE`.
 
-## First deploy: Hostinger VPS checklist
+**Checking a running deployment.** `ProductionDeploymentTest` (group
+`production`) makes real HTTPS requests through Caddy. It checks that `.env`,
+`.git`, `vendor/`, `storage/` and source files return 404, that the security
+headers are on pages and static files, and that `/up` answers. It is skipped
+unless `PRODUCTION_CHECK_URL` is set. Run it from any machine with Docker:
 
-Assumes a fresh Ubuntu 24.04 KVM VPS and a domain you control.
+```bash
+docker run --rm -e PRODUCTION_CHECK_URL=https://your-domain.com -e PRODUCTION_CHECK_HSTS=31536000 \
+  -v "$PWD:/var/www/html" -v madeeasy_test_vendor:/var/www/html/vendor \
+  --user root --entrypoint sh madeeasy-app:latest -c "php artisan test --group=production"
+```
 
-1. **DNS**: create `A` (and `AAAA` if using IPv6) records for the domain (and
-   `www` if wanted) pointing at the VPS IP. Wait until they resolve, or Caddy
-   can't obtain certificates.
-2. **Server prep** (as root or a sudo user):
+Leave out `PRODUCTION_CHECK_HSTS` until HSTS is switched on. For a local run
+of the production config, add `-e PRODUCTION_CHECK_INSECURE=1` (Caddy's
+internal CA), `--network madeeasy_internal` and
+`-e PRODUCTION_CHECK_RESOLVE=localhost:443:<caddy container IP>`.
+
+## Rate limits
+
+Every limit is in `config/madeeasy.php` → `rate_limits`, and nothing else
+hardcodes one. Route forms use named `throttle:<name>` middleware
+(`AppServiceProvider`). Livewire auth forms all post to `/livewire/update`, so
+they limit themselves through `App\Support\FormThrottle`. Over a limit, route
+forms answer 429; the tracking form and the Livewire forms show "Too many
+attempts…" on the form instead. `RateLimitTest` has one test per form, plus a
+test that fails if any new public POST route has no throttle.
+
+| Form | Limit | Keyed by |
+| --- | --- | --- |
+| Service request form, Buy Result Checker, Book a consultation (one shared "create an order" budget) | 5 / minute | IP |
+| Track your request (lookup) | 5 / minute, **and** 10 / hour per reference | IP; reference from any IP |
+| "Needs action" reply | 5 / minute | IP |
+| Testimonial submission | 5 / minute | IP |
+| Pay now + Paystack return page (shared) | 10 / minute | IP |
+| Course & cut-off search | 60 / minute | IP |
+| My Requests claim / dismiss / restore | 5 / minute | user |
+| Email verification link | 6 / minute | user |
+| Sign in | 5 **failed** attempts / minute (cleared on success) | email + IP |
+| Register | 5 / minute | IP |
+| Forgot password (sends email) | 5 / minute, and 1 email per address per minute | IP; address |
+| Reset password (with token) | 5 / minute | IP |
+| Resend verification email | 5 / minute | user |
+| Confirm password, change password | 5 / minute | user |
+
+The scheme: forms that create something or send an email get 5 a minute;
+guessable lookups also get a slower cap on the thing being guessed; payment
+steps get 10 (the return page refreshes itself); read-only search gets 60. The
+Paystack webhook is deliberately **not** limited: it is authenticated by its
+signature, and Paystack retries anything that fails.
+
+## Security headers
+
+`App\Http\Middleware\SecurityHeaders` (global) adds `X-Content-Type-Options:
+nosniff`, `X-Frame-Options: SAMEORIGIN` and `Referrer-Policy:
+strict-origin-when-cross-origin` to every Laravel response. Caddy sends the
+same headers for static files and strips the `Server` header; its values
+replace Laravel's, so nothing is sent twice. HSTS is controlled by
+`HSTS_MAX_AGE` (default 0, meaning off) in both places. Switch it on only once HTTPS works on the
+real domain (GO-LIVE.md): after that, browsers refuse plain HTTP for that long.
+
+The private `local` disk has Laravel's `serve` option **off**, so there is no
+`/storage/{path}` route for private files. Uploads are only served by
+`OrderDocumentController`, which checks ownership or role.
+
+## Production (Hostinger KVM 2)
+
+### What production adds
+
+On the VPS, `.env` contains
+`COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, so every plain
+`docker compose …` command uses both files. Never put that line in a local `.env`.
+`docker-compose.prod.yml` adds:
+
+- `restart: always` on every long-running service, so Docker restarts a crashed container
+  and starts everything after a reboot. This was checked by killing the main
+  process (SIGKILL from the host) of the worker, app and scheduler, and with
+  `queue:restart`. Each came back within a second, and the restarted worker
+  processed a new job.
+- CPU and memory caps for 2 cores / 8 GB: app 1.5 CPU / 1.5 GB, worker 1 / 512 MB,
+  scheduler 0.5 / 256 MB, db 1.5 / 2 GB (Postgres tuned to match), caddy
+  0.5 / 256 MB, backup 0.5 / 512 MB. That is about 5 GB, which leaves room for the OS, image builds
+  and the page cache.
+- Log rotation: every container uses json-file logs, 5 files × 10 MB.
+- `docker/caddy/Caddyfile.prod`: the real domain (no localhost fallback;
+  Compose refuses to start without `SITE_ADDRESS` and `ACME_EMAIL`), the HSTS
+  setting, JSON access logs, and explicit 404s for dotfiles, `vendor/`,
+  `storage/` internals and source paths. The Caddy image only contains
+  `public/` anyway.
+- app's healthcheck requests `/up` through php-fpm, so it fails if Laravel or
+  Postgres is down.
+- **scheduler**: `php artisan schedule:work` (no host cron).
+- **backup**: the nightly encrypted backup; **backup-restore**: a one-off restore container.
+
+### Production environment variables
+
+All of these go in `/opt/madeeasy/.env` on the VPS (`chmod 600 .env`). Keep a copy
+of the finished `.env` in a password manager. **It isn't in the backups**,
+and without the same `APP_KEY` a restored database can't decrypt PINs.
+
+| Variable | Production value | Notes |
+| --- | --- | --- |
+| `COMPOSE_FILE` | `docker-compose.yml:docker-compose.prod.yml` | VPS only |
+| `APP_ENV` | `production` | containers then cache config/routes/views on start |
+| `APP_DEBUG` | `false` | `true` shows stack traces and secrets to visitors |
+| `APP_KEY` | generated once (`key:generate --show`) | never change it casually; see [Rotating APP_KEY](#rotating-app_key) |
+| `APP_PREVIOUS_KEYS` | empty | only during a key rotation |
+| `APP_URL` | `https://your-domain.com` | used in emails, sitemap, canonical links |
+| `LOG_LEVEL` | `warning` | keep `LOG_CHANNEL=stderr` (rotated container logs) |
+| `SITE_ADDRESS` | `your-domain.com, www.your-domain.com` | what Caddy gets certificates for |
+| `ACME_EMAIL` | a monitored address | Let's Encrypt expiry notices |
+| `HSTS_MAX_AGE` | `0`, then `31536000` once HTTPS is confirmed | GO-LIVE.md |
+| `DB_PASSWORD` | long random (`openssl rand -base64 32`) | only read when the database volume is first created; changing it later needs `ALTER USER` too |
+| `SESSION_SECURE_COOKIE` | `true` | |
+| `MAIL_MAILER` | `smtp` | any transactional provider that offers SMTP |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SCHEME` | from the provider | `587` + `MAIL_SCHEME=null` (STARTTLS) or `465` + `smtps` |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | from the provider | SMTP credentials, not your mailbox password |
+| `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` | e.g. `no-reply@your-domain.com` | the domain must pass the provider's SPF/DKIM checks, or mail lands in spam |
+| `PAYSTACK_PUBLIC_KEY` | `pk_live_…` | Paystack → Settings → API Keys & Webhooks |
+| `PAYSTACK_SECRET_KEY` | `sk_live_…` | also the **webhook secret**: Paystack signs webhooks with the secret key, and there is no separate value |
+| `CONTACT_BUSINESS_NAME`, `CONTACT_PHONE`, `CONTACT_WHATSAPP`, `CONTACT_EMAIL`, `CONTACT_ADDRESS`, `CONTACT_HOURS` | the client's real details | `CONTACT_WHATSAPP` drives the floating WhatsApp button |
+| `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | the first admin | remove the password after seeding |
+| `EMAIL_STAFF_ON_*`, `PIN_*`, `CONSULTATION_*`, `UPLOAD_MAX_KILOBYTES` | defaults are fine | business tuning |
+| `BACKUP_AGE_RECIPIENTS` | the age public key(s) | required; see [Backups](#backups) |
+| `BACKUP_TARGET` + `BACKUP_SCP_*` or `BACKUP_S3_*` | the off-server destination | `local` is not a real backup |
+
+### Server hardening (on the VPS, by hand)
+
+These are done on the server itself, not from this repo. Do them before the
+site goes public, and keep a second SSH session open while changing SSH.
+
+1. **A sudo user with an SSH key** (Hostinger gives you root):
    ```bash
-   apt update && apt upgrade -y
-   curl -fsSL https://get.docker.com | sh          # Docker Engine + Compose plugin
-   ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw allow 443/udp && ufw enable
+   adduser deploy && usermod -aG sudo deploy
+   mkdir -p /home/deploy/.ssh && cp /root/.ssh/authorized_keys /home/deploy/.ssh/
+   chown -R deploy:deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys
    ```
-   Also check that the Hostinger panel firewall (if enabled) allows 80/443.
-3. **Clone the repo**:
+   Check that `ssh deploy@<vps-ip>` works with the key before going on.
+2. **SSH: keys only, no root login.** Create `/etc/ssh/sshd_config.d/99-hardening.conf`:
+   ```text
+   PasswordAuthentication no
+   KbdInteractiveAuthentication no
+   PermitRootLogin no
+   PubkeyAuthentication yes
+   ```
+   then run `sshd -t && systemctl reload ssh`. Open a **new** session to confirm you can still get in.
+3. **Firewall: only 22, 80 and 443.**
    ```bash
-   git clone <repo-url> /opt/madeeasy && cd /opt/madeeasy
+   ufw default deny incoming && ufw default allow outgoing
+   ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw allow 443/udp
+   ufw enable && ufw status verbose
    ```
-4. **Create `.env`**: `cp .env.example .env`, then edit:
-   - `APP_ENV=production`, `APP_DEBUG=false`, `LOG_LEVEL=warning`
-   - `APP_URL=https://your-domain.com`
-   - `SITE_ADDRESS=your-domain.com, www.your-domain.com` and `ACME_EMAIL=you@your-domain.com`
-   - `DB_PASSWORD=` a long random value (`openssl rand -base64 32`)
-   - `MAIL_MAILER=smtp` plus real `MAIL_*` SMTP credentials and `MAIL_FROM_ADDRESS`
-   - `PAYSTACK_PUBLIC_KEY` / `PAYSTACK_SECRET_KEY` (live keys when ready)
-   - `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (strong password)
-   - `chmod 600 .env`
-5. **App key**:
+   Set the same rules in the Hostinger panel firewall if it's enabled. Docker's
+   published ports bypass ufw, so **never publish the db port**. Only Caddy
+   publishes ports (80/443) in these Compose files.
+4. **Automatic security updates:**
    ```bash
-   docker compose run --rm --no-deps app php artisan key:generate --show   # paste into APP_KEY
+   apt install -y unattended-upgrades && dpkg-reconfigure -plow unattended-upgrades
    ```
-6. **Build and start the containers**:
-   ```bash
-   docker compose up -d --build
-   docker compose ps          # app & db should become "healthy"
-   ```
-7. **Migrate and seed**:
+   To let it reboot for kernel updates, set `Unattended-Upgrade::Automatic-Reboot "true";` and
+   `Unattended-Upgrade::Automatic-Reboot-Time "04:00";` in
+   `/etc/apt/apt.conf.d/50unattended-upgrades`. The containers come back on their own (`restart: always`).
+
+### First deploy
+
+1. **DNS:** `A` (and `AAAA` for IPv6) records for the domain and `www`, pointing at the VPS. Wait until they resolve.
+2. **Harden the server** (section above), then install Docker:
+   `curl -fsSL https://get.docker.com | sh && usermod -aG docker deploy` (sign in again for the group to apply).
+3. **Clone** (as `deploy`): `sudo mkdir /opt/madeeasy && sudo chown deploy: /opt/madeeasy && git clone <repo-url> /opt/madeeasy && cd /opt/madeeasy`.
+4. **`.env`:** `cp .env.example .env`, set everything in
+   [the table](#production-environment-variables), then `chmod 600 .env`.
+5. **App key:** `docker compose run --rm --no-deps app php artisan key:generate --show`, paste it into `APP_KEY`.
+   Save the finished `.env` in the password manager.
+6. **Backups:** set up the age key and destination ([Backups](#backups)).
+7. **Start:** `docker compose up -d --build`, then `docker compose ps`. Everything should be Up, with app and db healthy.
+8. **Schema and first admin:**
    ```bash
    docker compose exec app php artisan migrate --force
    docker compose exec app php artisan db:seed --force
    ```
-   Afterwards, remove `SEED_ADMIN_PASSWORD` from `.env`.
-8. **Point Caddy at the real domain.** This is done by `SITE_ADDRESS` in step 4.
-   Watch `docker compose logs -f caddy` for "certificate obtained successfully",
-   then check `https://your-domain.com`, `/hello` and `/admin`.
-9. **Scheduler**: add the cron entry from [Queue and task scheduler](#queue-and-task-scheduler).
-10. **Backups** (recommended): nightly `pg_dump`, e.g.
-    `docker compose exec -T db pg_dump -U madeeasy madeeasy | gzip > /root/backups/madeeasy-$(date +\%F).sql.gz`,
-    plus the `app_storage` volume (private uploads) and the `public_media`
-    volume (Updates images). Copy them all off the server.
+   Then remove `SEED_ADMIN_PASSWORD` from `.env`.
+9. **HTTPS:** `docker compose logs -f caddy` until "certificate obtained successfully", then open the site.
+10. Continue with [GO-LIVE.md](GO-LIVE.md): data clean-up, Paystack, the
+    deployment check, HSTS, and the first backup and restore drill.
 
 **Subsequent deploys:**
 
@@ -652,8 +792,150 @@ Assumes a fresh Ubuntu 24.04 KVM VPS and a domain you control.
 cd /opt/madeeasy && git pull
 docker compose up -d --build
 docker compose exec app php artisan migrate --force
+docker image prune -f          # old images otherwise fill the disk
 ```
 
-In production the containers run `php artisan optimize` and `filament:optimize`
-on start. After editing `.env`, run `docker compose up -d` to recreate the
-containers and rebuild the config cache.
+After editing `.env`, run `docker compose up -d` to recreate the containers and rebuild the config cache.
+
+### Rotating APP_KEY
+
+`APP_KEY` encrypts sessions and cookies, signs links (password reset, email
+verification, Updates previews), and encrypts result checker PINs. It is also the key of
+`pin_hash`, the HMAC that stops the same PIN being uploaded twice
+(`ResultCheckerPin::hash()`). Laravel can still **decrypt** with old keys
+listed in `APP_PREVIOUS_KEYS`. Hashes can't be "decrypted", though: after a key change every new upload would hash
+differently from the existing stock, and duplicates would slip through.
+`php artisan pins:rekey` fixes that by re-encrypting every PIN and recomputing
+every hash with the new key. It runs in one transaction, so the PINs move to the new key all together or not at all.
+
+Rotate only for a reason (the key leaked, or a staff member with server access left). Procedure:
+
+1. **Back up first:** `docker compose exec backup backup-now`. Note the current
+   key; the backup can only be read with it.
+2. **Stop PIN uploads for a few minutes.** Tell staff, or run `docker compose exec app php artisan down`
+   for a short maintenance window.
+3. **New key:** `docker compose run --rm --no-deps app php artisan key:generate --show`.
+4. **Edit `.env`:** move the current value to `APP_PREVIOUS_KEYS=` (comma-separate
+   if there are several) and put the new one in `APP_KEY=`.
+5. **Apply:** `docker compose up -d`, which recreates app, worker and scheduler with the new config.
+6. **Re-key the PINs:** `docker compose exec app php artisan pins:rekey --force`.
+   It prints the number re-keyed. If it says a PIN can't be decrypted, the old key isn't in
+   `APP_PREVIOUS_KEYS`. Nothing was changed; fix `.env` and run it again.
+7. **Check:** `php artisan up` if you used maintenance mode. As an admin, open
+   an order with a PIN and use "Show PIN". Then upload a CSV containing one PIN
+   that's already in stock: it must be reported as a duplicate.
+8. **Remove the old key.** If the key **leaked**, do it straight after step 7, and
+   also sign everyone out: `docker compose exec app php artisan tinker --execute "DB::table('sessions')->truncate();"`.
+   For a routine rotation, wait a week, then empty `APP_PREVIOUS_KEYS` and run `docker compose up -d`.
+   Until then, existing sign-ins, "remember me" cookies and emailed links keep
+   working. Afterwards, anyone still holding an old one just signs in again or
+   asks for a new link.
+9. **Update the password-manager copy of `.env`.** Backups made before the rotation
+   need the old key to be useful (PINs), so keep the old key with them until they expire.
+
+### Backups
+
+Hostinger's daily server backup and these backups protect against different failure modes:
+
+| | Hostinger snapshot | This backup job |
+| --- | --- | --- |
+| Where | Hostinger, same account | another provider or host (`BACKUP_TARGET`) |
+| Restores | the whole server, all-or-nothing | the database and files only, or a drill into a scratch database |
+| Survives | a broken upgrade or a lost disk | losing the Hostinger account or server, ransomware, or "someone deleted orders yesterday" (restore to scratch and copy rows) |
+| Readable by | anyone with panel access | only the holder of the age private key |
+
+The **backup** service runs `backup-now` daily at `BACKUP_SCHEDULE` (default
+02:30 Lagos time). Each run creates three files:
+
+- `madeeasy-<stamp>-db.dump.age`: `pg_dump` (custom format).
+- `madeeasy-<stamp>-files.tar.gz.age`: `storage/app/private` (customer documents) plus the public disk (Updates images).
+- `madeeasy-<stamp>.sha256`: checksums of the two encrypted files.
+
+Both data files are encrypted with [age](https://age-encryption.org) to the
+**public** key(s) in `BACKUP_AGE_RECIPIENTS`. They are uploaded to the destination
+and kept on the server for `BACKUP_KEEP_LOCAL_DAYS`. The private key is never on the server.
+
+**Setting up:**
+
+1. **Key pair, on your own computer:** `docker run --rm alpine sh -c "apk add -q age && age-keygen"`.
+   Save the whole output as `madeeasy-backup-key.txt` in the password manager, plus one offline copy.
+   Put the `age1…` public key in `BACKUP_AGE_RECIPIENTS`. To let a second
+   person restore independently, add their public key too, separated by a space.
+2. **Destination**, one of:
+   - **SCP to another host**: `BACKUP_TARGET=scp`, with `BACKUP_SCP_DESTINATION=backup@host:/srv/backups/madeeasy`
+     and `BACKUP_SCP_PORT`. On the VPS:
+     ```bash
+     mkdir -p /opt/madeeasy/backup-ssh && cd /opt/madeeasy/backup-ssh
+     ssh-keygen -t ed25519 -N '' -f id_ed25519      # add id_ed25519.pub to the backup user's authorized_keys
+     ssh-keyscan -p 22 host > known_hosts            # pins the host key; scp refuses unknown hosts
+     ```
+     Prune old copies on the backup host (e.g. a cron job running `find /srv/backups/madeeasy -mtime +30 -delete`).
+   - **S3-compatible storage** (AWS S3, Backblaze B2, Cloudflare R2, Wasabi, …): `BACKUP_TARGET=s3`,
+     `BACKUP_S3_ENDPOINT` (empty for AWS), `BACKUP_S3_REGION`, `BACKUP_S3_BUCKET`, `BACKUP_S3_PREFIX`,
+     `BACKUP_S3_ACCESS_KEY_ID` and `BACKUP_S3_SECRET_ACCESS_KEY`. Use a key that can only **write** to that
+     bucket, if the provider allows it, so someone who takes over the server can't delete the backups.
+     Set a lifecycle rule on the bucket to expire old copies (e.g. 30 days).
+3. **Apply and test:** `docker compose up -d backup`, then `docker compose exec backup backup-now`.
+   Confirm the three files arrived at the destination. Then do a restore drill (below).
+
+**Checking it runs:** `docker compose exec backup cat /backups/last-success` shows the
+time and name of the last good run. `docker compose logs --tail 50 backup` shows every run's
+output and any "FAILED: …" line.
+
+### Restoring from a backup
+
+All commands are run in `/opt/madeeasy`. `<stamp>` looks like `20261002T013000Z`.
+
+1. **Fetch** the set from the destination into the backups volume:
+   `docker compose exec backup backup-fetch` lists what's there, and
+   `docker compose exec backup backup-fetch <stamp>` downloads one set and checks its checksums.
+2. **Bring the private key in**, only for the restore:
+   `docker compose cp madeeasy-backup-key.txt backup:/backups/restore/key.txt`.
+3. **Drill** (safe at any time; changes nothing live):
+   `docker compose exec backup backup-restore <stamp> /backups/restore/key.txt`.
+   It restores the database into `madeeasy_restore_check` and the files into
+   `/backups/restore/files`, then prints row and file counts. Compare them with
+   the live site. Clean up with `docker compose exec db dropdb -U madeeasy madeeasy_restore_check`.
+4. **Disaster recovery** (replaces the live data):
+   - On a new server, do [First deploy](#first-deploy) steps 1–7 with the **same
+     `.env`** (above all, the same `APP_KEY`). Skip step 8: the backup has the schema and the admin.
+   - Run:
+     ```bash
+     docker compose stop app worker scheduler
+     docker compose run --rm backup-restore backup-restore <stamp> /backups/restore/key.txt --live
+     docker compose up -d
+     ```
+     If you're on a new server, run `docker compose exec app php artisan migrate --force` too, in
+     case the code is newer than the backup.
+5. **Remove the key** whatever the outcome: `docker compose exec backup rm -rf /backups/restore`.
+
+Both modes were tested end to end on the local stack: a backup, a drill whose
+counts matched live in every table, and a `--live` restore that brought back a
+deleted private document byte for byte, with PINs still decrypting.
+**Do a drill on the real server after the first night's backup, and then every
+few months** (GO-LIVE.md).
+
+### Monitoring and logs
+
+There's no paid monitoring service; these checks cover the basics.
+
+- **Is everything up?** `docker compose ps`: every service should be Up, with app and db
+  `(healthy)`. `docker inspect -f '{{.RestartCount}}' madeeasy-worker-1`
+  shows how often Docker has had to restart the worker. A climbing number means it keeps crashing; check its logs.
+- **Health check:** `curl -fsS https://your-domain.com/up` returns 200 "Application up"
+  only if Laravel **and** the database answer. A free external uptime checker
+  can poll that URL every few minutes and email you when it fails.
+- **Is the queue worker alive and keeping up?**
+  - `docker compose logs --tail 50 worker` shows a `RUNNING` / `DONE` line per job.
+  - `docker compose exec app php artisan queue:monitor database:default --max=50` reports
+    the number of waiting jobs. It should be near 0; a growing number means the worker is stuck or down.
+  - `docker compose exec app php artisan queue:failed` lists failed jobs; retry them with `queue:retry all`.
+  - `docker compose restart worker` if in doubt (jobs are not lost).
+- **Scheduler:** `docker compose logs --tail 20 scheduler`. It logs every task it runs.
+- **Tail logs:** `docker compose logs -f --tail 100 app worker` (Laravel logs to
+  stderr). Caddy's access log is JSON: `docker compose logs caddy | grep '"status":5'` finds server errors.
+- **Log rotation:** every container is capped at 5 × 10 MB of logs
+  (`docker-compose.prod.yml`), and Laravel writes nothing to `storage/logs`, so
+  logs can't fill the disk.
+- **Disk:** `df -h /` and `docker system df`. Prune old images after deploys.
+

@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\FormThrottle;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -18,6 +19,8 @@ new class extends Component
     public function updatePassword(): void
     {
         try {
+            FormThrottle::hit('password-checks', (string) Auth::id(), 'current_password');
+
             $validated = $this->validate([
                 'current_password' => ['required', 'string', 'current_password'],
                 'password' => ['required', 'string', Password::defaults(), 'confirmed'],

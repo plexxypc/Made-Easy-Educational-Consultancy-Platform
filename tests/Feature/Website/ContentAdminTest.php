@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Website;
 
+use App\Actions\Faqs\InstallOfficialFaqs;
 use App\Enums\SiteSettingKey;
 use App\Filament\Resources\Faqs\FaqResource;
 use App\Filament\Resources\Faqs\Pages\ManageFaqs;
@@ -13,6 +14,7 @@ use App\Models\User;
 use Database\Seeders\FaqSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -83,6 +85,51 @@ class ContentAdminTest extends TestCase
             ->assertOk()
             ->assertActionHidden('create')
             ->assertActionHidden(TestAction::make('edit')->table(Faq::query()->first()));
+    }
+
+    /**
+     * Installing the official wording removes untouched drafts, keeps (and
+     * reports) a draft an admin edited, leaves admin-added questions alone,
+     * and is safe to re-run.
+     *
+     * @return void
+     */
+    public function test_official_faqs_replace_untouched_drafts(): void
+    {
+        $this->seed(FaqSeeder::class);
+        [$edited_question] = FaqSeeder::DRAFTED[1];
+        Faq::query()->where('question', $edited_question)->update(['answer' => 'Edited by an admin.']);
+        Faq::factory()->create(['question' => 'Added by an admin?']);
+
+        $official = array_map(fn (int $number): array => ["Official question {$number}?", "Official answer {$number}."], range(1, 7));
+
+        $result = app(InstallOfficialFaqs::class)->handle($official, FaqSeeder::DRAFTED);
+
+        $this->assertSame(['added' => 7, 'removed' => 6, 'kept_drafts' => [$edited_question]], $result);
+        $this->assertSame(
+            array_column($official, 0),
+            Faq::query()->whereLike('question', 'Official%')->orderBy('sort_order')->pluck('question')->all(),
+        );
+        $this->assertTrue(Faq::query()->where('question', 'Added by an admin?')->exists());
+
+        $again = app(InstallOfficialFaqs::class)->handle($official, FaqSeeder::DRAFTED);
+        $this->assertSame(0, $again['added']);
+        $this->assertSame(9, Faq::query()->count());
+    }
+
+    /**
+     * An incomplete official list is refused, and the drop-in file is either
+     * still empty (pending) or holds exactly the seven questions.
+     *
+     * @return void
+     */
+    public function test_official_faqs_must_be_complete(): void
+    {
+        $official_count = count(FaqSeeder::official_faqs());
+        $this->assertContains($official_count, [0, InstallOfficialFaqs::OFFICIAL_COUNT], 'database/'.FaqSeeder::OFFICIAL_FILE.' must be empty or hold all 7 questions.');
+
+        $this->expectException(InvalidArgumentException::class);
+        app(InstallOfficialFaqs::class)->handle([['Only one?', 'Yes.']], FaqSeeder::DRAFTED);
     }
 
     /**

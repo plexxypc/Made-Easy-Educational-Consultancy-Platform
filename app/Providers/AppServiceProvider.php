@@ -3,9 +3,13 @@
 namespace App\Providers;
 
 use App\Models\Order;
+use App\Support\FormThrottle;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,28 +34,42 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->register_blade_directives();
         $this->register_rate_limiters();
+        $this->register_health_checks();
     }
 
     /**
-     * "service-requests": public request form submissions, per IP.
-     * Assumption: 5 per minute is plenty for a real customer and slows spam bots.
+     * /up (Laravel's health route) also proves the database answers, so a
+     * monitor or `curl /up` catches "PHP is up but Postgres is not" as a 500.
      *
-     * "order-lookups": the "Track your request" form. Same per-IP limit as the
-     * request form, plus a per-reference hourly cap so one order can't be
-     * brute-forced from many IPs. Over the limit, the visitor is sent back to
-     * the form with a message instead of a bare 429 page.
+     * @return void
+     */
+    private function register_health_checks(): void
+    {
+        Event::listen(DiagnosingHealth::class, function (): void {
+            DB::connection()->select('select 1');
+        });
+    }
+
+    /**
+     * Named route limiters. The numbers, and the reasoning behind them, are in
+     * config('madeeasy.rate_limits'); see FormThrottle for the Livewire forms.
      *
-     * "order-responses": needs-action replies (already access-checked), per IP.
-     *
-     * "order-payments": "Pay now" and the Paystack return page (which calls
-     * Paystack's verify API), per IP. The return page refreshes itself while
-     * waiting for the webhook, hence a higher limit.
+     * "order-lookups" also caps each reference number per hour so one order
+     * can't be brute-forced from many IPs, and sends the visitor back to the
+     * form with a message instead of a bare 429 page.
      *
      * @return void
      */
     private function register_rate_limiters(): void
     {
-        RateLimiter::for('service-requests', fn (Request $request): Limit => Limit::perMinute(5)->by($request->ip()));
+        foreach (['service-requests', 'order-responses', 'testimonials', 'order-payments', 'course-search'] as $name) {
+            RateLimiter::for($name, fn (Request $request): Limit => FormThrottle::route_limit($name)->by($name.':'.$request->ip()));
+        }
+
+        foreach (['account-claims', 'verification-links'] as $name) {
+            RateLimiter::for($name, fn (Request $request): Limit => FormThrottle::route_limit($name)
+                ->by($name.':'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        }
 
         RateLimiter::for('order-lookups', function (Request $request): array {
             $too_many_attempts = fn () => back()
@@ -60,18 +78,14 @@ class AppServiceProvider extends ServiceProvider
             $reference = Order::normaliseReference((string) $request->input('reference'));
 
             return [
-                Limit::perMinute(config('madeeasy.order_lookups.per_minute_per_ip'))
+                FormThrottle::route_limit('order-lookups')
                     ->by('ip:'.$request->ip())
                     ->response($too_many_attempts),
-                Limit::perHour(config('madeeasy.order_lookups.per_hour_per_reference'))
+                FormThrottle::route_limit('order-lookups-per-reference')
                     ->by('reference:'.$reference)
                     ->response($too_many_attempts),
             ];
         });
-
-        RateLimiter::for('order-responses', fn (Request $request): Limit => Limit::perMinute(5)->by($request->ip()));
-
-        RateLimiter::for('order-payments', fn (Request $request): Limit => Limit::perMinute(10)->by($request->ip()));
     }
 
     /**

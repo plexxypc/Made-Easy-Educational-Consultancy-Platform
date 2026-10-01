@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Forms;
 
+use App\Support\FormThrottle;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
@@ -31,35 +31,33 @@ class LoginForm extends Form
         $this->ensureIsNotRateLimited();
 
         if (! Auth::attempt($this->only(['email', 'password']), $this->remember)) {
-            RateLimiter::hit($this->throttleKey());
+            FormThrottle::record_failure('logins', $this->throttleKey());
 
             throw ValidationException::withMessages([
                 'form.email' => trans('auth.failed'),
             ]);
         }
 
-        RateLimiter::clear($this->throttleKey());
+        FormThrottle::clear('logins', $this->throttleKey());
     }
 
     /**
-     * Ensure the authentication request is not rate limited.
+     * Ensure the authentication request is not rate limited
+     * (config('madeeasy.rate_limits.logins'): failed attempts per email + IP).
+     *
+     * @return void
+     *
+     * @throws ValidationException
      */
     protected function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
-            return;
+        try {
+            FormThrottle::ensure_not_limited('logins', $this->throttleKey(), 'form.email');
+        } catch (ValidationException $exception) {
+            event(new Lockout(request()));
+
+            throw $exception;
         }
-
-        event(new Lockout(request()));
-
-        $seconds = RateLimiter::availableIn($this->throttleKey());
-
-        throw ValidationException::withMessages([
-            'form.email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
-        ]);
     }
 
     /**

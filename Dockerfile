@@ -70,4 +70,20 @@ CMD ["php-fpm"]
 FROM caddy:2-alpine AS caddy
 
 COPY docker/caddy/Caddyfile /etc/caddy/Caddyfile
+# Selected by docker-compose.prod.yml.
+COPY docker/caddy/Caddyfile.prod /etc/caddy/Caddyfile.prod
 COPY --from=app /var/www/html/public /var/www/html/public
+
+# ---------------------------------------------------------------------------
+# Nightly encrypted backups (docker-compose.prod.yml "backup" service)
+# ---------------------------------------------------------------------------
+FROM postgres:16-alpine AS backup
+
+RUN apk add --no-cache age aws-cli openssh-client tar tzdata
+
+COPY docker/backup/ /opt/backup/
+RUN sed -i 's/\r$//' /opt/backup/*.sh \
+    && for script in /opt/backup/*.sh; do install -m 0755 "$script" "/usr/local/bin/$(basename "$script" .sh)"; done
+
+ENTRYPOINT []
+CMD ["backup-cron"]

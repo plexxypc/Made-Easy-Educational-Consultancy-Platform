@@ -2,26 +2,37 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Faqs\InstallOfficialFaqs;
 use App\Models\Faq;
 use Illuminate\Database\Seeder;
 
 /**
  * The 7 FAQs for PDF section 13.
  *
- * CLIENT REVIEW: the PDF's exact wording wasn't available when this was
- * written, so these questions and answers are DRAFTED from what the site
- * actually does. Check them against the PDF, then edit in the back office
- * (Website > FAQ). Safe to re-run: questions are matched by text, and
- * existing ones are left as they are so admin edits are never overwritten.
+ * PENDING: the official wording goes in database/data/faqs_section_13.php.
+ * While that file is empty, this seeds the DRAFTED stand-ins below (written
+ * from what the site actually does). Once it holds the seven official
+ * questions, this installs them instead and removes the untouched drafts
+ * (InstallOfficialFaqs).
+ *
+ * Safe to re-run either way: questions are matched by text, and existing
+ * answers are left as they are so admin edits are never overwritten.
  */
 class FaqSeeder extends Seeder
 {
     /**
-     * [question, answer]. Blank lines in answers separate paragraphs.
+     * Where the official wording is pasted (relative to database/).
+     *
+     * @var string
+     */
+    public const OFFICIAL_FILE = 'data/faqs_section_13.php';
+
+    /**
+     * Drafted stand-ins: [question, answer]. Blank lines in answers separate paragraphs.
      *
      * @var array<int, array{0: string, 1: string}>
      */
-    private const FAQS = [
+    public const DRAFTED = [
         [
             'What services do you offer?',
             "We help with WAEC, NECO, GCE and NABTEB registration, JAMB services, admission guidance for universities, polytechnics and colleges of education, result checker PINs, and document services such as certificates, affidavits and verification.\n\nWe also offer online Mathematics tutorials, arranged on WhatsApp.",
@@ -55,15 +66,42 @@ class FaqSeeder extends Seeder
     /**
      * Run the database seeds.
      *
+     * @param  InstallOfficialFaqs  $install_official_faqs
      * @return void
      */
-    public function run(): void
+    public function run(InstallOfficialFaqs $install_official_faqs): void
     {
-        foreach (self::FAQS as $position => [$question, $answer]) {
+        $official = self::official_faqs();
+
+        if ($official !== []) {
+            $result = $install_official_faqs->handle($official, self::DRAFTED);
+
+            $this->command?->info(sprintf('Official FAQs: %d added, %d drafted removed.', $result['added'], $result['removed']));
+
+            foreach ($result['kept_drafts'] as $question) {
+                $this->command?->warn('Kept a drafted FAQ an admin edited; review or delete it in Website > FAQ: '.$question);
+            }
+
+            return;
+        }
+
+        foreach (self::DRAFTED as $position => [$question, $answer]) {
             Faq::query()->firstOrCreate(
                 ['question' => $question],
                 ['answer' => $answer, 'sort_order' => $position + 1, 'is_active' => true],
             );
         }
+    }
+
+    /**
+     * The official wording from OFFICIAL_FILE ([] while still pending).
+     *
+     * @return array<int, array{0: string, 1: string}>
+     */
+    public static function official_faqs(): array
+    {
+        $path = database_path(self::OFFICIAL_FILE);
+
+        return is_file($path) ? (array) require $path : [];
     }
 }

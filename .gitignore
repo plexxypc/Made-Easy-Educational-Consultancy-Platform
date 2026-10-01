@@ -12,6 +12,9 @@
 /.vscode
 /.zed
 /auth.json
+/backup-ssh
+*.age
+age-identity*.txt
 /node_modules
 /public/build
 /public/css/filament

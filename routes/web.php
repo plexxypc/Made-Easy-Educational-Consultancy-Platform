@@ -73,7 +73,7 @@ Route::post('book-consultation', [ConsultationBookingController::class, 'book'])
 
 // Course & cut-off search: informational only (no application or payment).
 Route::get('admission/course-search', AdmissionSearchController::class)
-    ->middleware('throttle:60,1')
+    ->middleware('throttle:course-search')
     ->name('admission.search');
 
 // Updates (blog): published posts only; drafts and scheduled posts 404.
@@ -97,7 +97,7 @@ Route::get('maths-tutoring', [PageController::class, 'maths_tutoring'])->name('m
 Route::get('testimonials', [TestimonialController::class, 'index'])->name('testimonials');
 Route::get('track/{order:reference}/testimonial', [TestimonialController::class, 'create'])->name('orders.testimonial');
 Route::post('track/{order:reference}/testimonial', [TestimonialController::class, 'store'])
-    ->middleware('throttle:order-responses')
+    ->middleware('throttle:testimonials')
     ->name('orders.testimonial.store');
 
 // Generated so they carry the live host; public/robots.txt must not exist (Caddy would serve it instead).
@@ -119,13 +119,13 @@ Route::get('my-requests', [CustomerDashboardController::class, 'show'])
     ->middleware(['auth'])
     ->name('my-requests');
 Route::post('my-requests/claim', [CustomerDashboardController::class, 'claim'])
-    ->middleware(['auth', 'verified', 'throttle:6,1'])
+    ->middleware(['auth', 'verified', 'throttle:account-claims'])
     ->name('my-requests.claim');
 Route::post('my-requests/claim/dismiss', [CustomerDashboardController::class, 'dismiss_claim'])
-    ->middleware(['auth', 'throttle:6,1'])
+    ->middleware(['auth', 'throttle:account-claims'])
     ->name('my-requests.claim.dismiss');
 Route::post('my-requests/claim/restore', [CustomerDashboardController::class, 'restore_claim'])
-    ->middleware(['auth', 'throttle:6,1'])
+    ->middleware(['auth', 'throttle:account-claims'])
     ->name('my-requests.claim.restore');
 
 Route::view('profile', 'profile')

@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             ServiceCatalogueSeeder::class,
             PostCategorySeeder::class,
-            FaqSeeder::class, // drafted wording: review against PDF section 13
+            FaqSeeder::class, // drafted until database/data/faqs_section_13.php is filled in
             TestUsersSeeder::class, // skipped in production
         ]);
 

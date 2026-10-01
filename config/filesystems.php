@@ -33,7 +33,9 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // No /storage/{path} routes for private files: uploads are only
+            // served by OrderDocumentController, which checks ownership/role.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

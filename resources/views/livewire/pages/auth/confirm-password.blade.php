@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\FormThrottle;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -14,6 +15,8 @@ new #[Layout('layouts.guest')] class extends Component
      */
     public function confirmPassword(): void
     {
+        FormThrottle::hit('password-checks', (string) Auth::id(), 'password');
+
         $this->validate([
             'password' => ['required', 'string'],
         ]);

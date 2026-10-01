@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Support\FormThrottle;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -20,6 +21,8 @@ new #[Layout('layouts.guest')] class extends Component
      */
     public function register(): void
     {
+        FormThrottle::hit('registrations', (string) request()->ip(), 'email');
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
