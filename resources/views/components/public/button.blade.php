@@ -2,13 +2,17 @@
     'href',
     'variant' => 'primary',
 ])
-{{-- Large, full-width-on-mobile link button (48px min tap target). --}}
+{{--
+    Large, full-width-on-mobile link button (48px min tap target).
+    primary: the orange call to action (one per section where possible); dark: a strong second choice;
+    secondary: everything else. Ink text on orange keeps WCAG AA contrast.
+--}}
 <a
     href="{{ $href }}"
     {{ $attributes->class([
-        'inline-flex min-h-[52px] w-full items-center justify-center rounded-xl px-6 text-base font-semibold shadow-sm transition focus:outline-none focus-visible:ring-4 sm:w-auto',
-        'bg-brand-700 text-white hover:bg-brand-800 focus-visible:ring-brand-300' => $variant === 'primary',
-        'bg-accent-400 text-slate-900 hover:bg-accent-300 focus-visible:ring-accent-200' => $variant === 'accent',
-        'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 focus-visible:ring-slate-200' => $variant === 'secondary',
+        'inline-flex min-h-[52px] w-full items-center justify-center rounded-xl border-2 border-ink px-6 text-base font-semibold sm:w-auto',
+        'bg-accent text-ink shadow-pop hover:bg-accent-600' => $variant === 'primary',
+        'bg-ink text-white hover:bg-ink/85' => $variant === 'dark',
+        'bg-white text-ink hover:bg-surface' => $variant === 'secondary',
     ]) }}
 >{{ $slot }}</a>

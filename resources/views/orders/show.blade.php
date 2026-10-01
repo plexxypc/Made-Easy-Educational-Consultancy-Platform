@@ -147,13 +147,13 @@
                     <h2 id="testimonial-heading" class="text-lg font-bold text-slate-900">How did we do?</h2>
                     <p class="mt-1 text-slate-700">A few words about your experience help other students and parents choose with confidence.</p>
                 </div>
-                <x-public.button :href="route('orders.testimonial', $order)" variant="accent">Share your experience</x-public.button>
+                <x-public.button :href="route('orders.testimonial', $order)" variant="dark">Share your experience</x-public.button>
             </section>
         @endif
 
         @if ($receipt)
             <section class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5" aria-labelledby="payment-heading">
-                <h2 id="payment-heading" class="text-lg font-bold text-emerald-900">Paid: {{ $receipt->amount_label }}</h2>
+                <h2 id="payment-heading" class="font-sans text-lg font-bold text-emerald-900">Paid: {{ $receipt->amount_label }}</h2>
                 <p class="mt-1 text-slate-700">Receipt {{ $receipt->number }} · {{ $receipt->paidAtLabel() }}</p>
                 <div class="mt-4 grid gap-3 sm:flex">
                     <x-public.button :href="route('orders.receipt', $order)">View receipt</x-public.button>
@@ -162,7 +162,7 @@
             </section>
         @elseif ($order->canBePaid())
             <section class="mt-6 rounded-2xl border-2 border-brand-200 bg-brand-50/60 p-5 sm:p-6" aria-labelledby="payment-heading">
-                <h2 id="payment-heading" class="text-xl font-bold text-slate-900">Amount to pay: {{ \App\Support\Money::format($order->total_amount) }}</h2>
+                <h2 id="payment-heading" class="font-sans text-xl font-bold text-slate-900">Amount to pay: {{ \App\Support\Money::format($order->total_amount) }}</h2>
                 <p class="mt-2 text-slate-700">Pay securely by card, bank transfer or USSD through Paystack. You'll come back here afterwards.</p>
                 <form method="POST" action="{{ route('orders.pay', $order) }}" class="mt-4">
                     @csrf

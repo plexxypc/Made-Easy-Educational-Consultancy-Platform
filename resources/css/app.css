@@ -2,22 +2,91 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Rich text from the Updates post editor (resources/views/updates/show.blade.php). */
+/* Kodchasan (SIL Open Font License, resources/fonts/kodchasan/OFL.txt), self-hosted: headings only. */
+@font-face {
+    font-family: 'Kodchasan';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/kodchasan/kodchasan-600-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'Kodchasan';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/kodchasan/kodchasan-600-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'Kodchasan';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/kodchasan/kodchasan-700-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'Kodchasan';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/kodchasan/kodchasan-700-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@layer base {
+    h1,
+    h2,
+    h3 {
+        @apply font-display;
+    }
+
+    /* Visible keyboard focus everywhere, on any background. Mouse clicks don't show it. */
+    :focus-visible {
+        outline: 3px solid theme('colors.ink');
+        outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}
+
 @layer components {
+    /* Horizontal card carousel (homepage categories): CSS scroll snap, swipe on touch, Tab moves card to card. */
+    .carousel {
+        @apply flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-5;
+        scrollbar-color: theme('colors.ink') transparent;
+        scrollbar-width: thin;
+    }
+    .carousel > * {
+        @apply shrink-0 snap-start;
+    }
+
+    /* Rich text from the Updates post editor (resources/views/updates/show.blade.php). */
     .post-body {
-        @apply text-base leading-relaxed text-slate-800;
+        @apply text-base leading-relaxed text-ink/90;
     }
     .post-body > * + * {
         @apply mt-4;
     }
     .post-body h2 {
-        @apply mt-8 text-2xl font-bold text-slate-900;
+        @apply mt-8 text-2xl font-bold text-ink;
     }
     .post-body h3 {
-        @apply mt-6 text-xl font-semibold text-slate-900;
+        @apply mt-6 text-xl font-semibold text-ink;
     }
     .post-body a {
-        @apply font-semibold text-brand-700 underline;
+        @apply font-semibold text-accent-700 underline;
     }
     .post-body ul {
         @apply list-disc pl-6;
@@ -29,7 +98,7 @@
         @apply mt-1;
     }
     .post-body blockquote {
-        @apply border-l-4 border-brand-300 pl-4 italic text-slate-700;
+        @apply border-l-4 border-accent pl-4 italic text-ink/80;
     }
     .post-body img {
         @apply h-auto max-w-full rounded-xl;
@@ -39,9 +108,9 @@
     }
     .post-body th,
     .post-body td {
-        @apply border border-slate-200 px-3 py-2 text-left align-top;
+        @apply border border-ink/15 px-3 py-2 text-left align-top;
     }
     .post-body th {
-        @apply bg-slate-50 font-semibold;
+        @apply bg-surface font-semibold;
     }
 }

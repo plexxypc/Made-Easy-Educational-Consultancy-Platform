@@ -153,7 +153,7 @@
                 <p class="text-lg font-semibold text-slate-900">Want help choosing and applying?</p>
                 <p class="text-sm text-slate-700">Our team will look at your scores and guide you through your admission options.</p>
             </div>
-            <x-public.button :href="$admission_guidance_url" variant="accent">Get Admission Guidance</x-public.button>
+            <x-public.button :href="$admission_guidance_url" variant="dark">Get Admission Guidance</x-public.button>
         </div>
     </section>
 </x-public-layout>

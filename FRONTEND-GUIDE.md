@@ -57,10 +57,45 @@ the text comes from the back office, `.env` or the database (section 3).
 | Mobile menu ("Menu" button) | `header.blade.php`, the `<details>` block | Works without JavaScript. Shows below the `xl` screen width (1280px). |
 | **Footer** | `resources/views/partials/public/footer.blade.php` | The tagline "Making your educational journey easier." and the extra links (Track, Maths, FAQ, Testimonials) are here. |
 | **Floating WhatsApp button** | `public-layout.blade.php` (bottom) | The number is `CONTACT_WHATSAPP` in `.env`; the link is built in `app/Support/WhatsApp.php`. Pages can pass a pre-filled message via `whatsapp-message="…"`. |
-| Colours (brand blue, accent amber) | `tailwind.config.js` → `colors.brand` / `colors.accent` | Change `colors.blue` to another Tailwind colour to rebrand everything that uses `brand-*`. |
-| Buttons on public pages | `resources/views/components/public/button.blade.php` | Variants: `primary` (blue), `accent` (amber), `secondary` (white). Used as `<x-public.button :href="…" variant="accent">`. |
-| Blog post body styling (headings, lists, tables inside a post) | `resources/css/app.css` (`.post-body`) | The only hand-written CSS in the project. |
-| Font | `tailwind.config.js` (Figtree) | Note: public pages don't load the Figtree web font, so they show the system font. Only the login/register pages load it (`layouts/guest.blade.php`). |
+| Colours and fonts (the design tokens) | `tailwind.config.js` | See [Design system](#design-system) below. |
+| Buttons on public pages | `resources/views/components/public/button.blade.php` | Variants: `primary` (orange), `dark` (ink), `secondary` (white, outlined). Used as `<x-public.button :href="…" variant="dark">`. |
+| Hand-written CSS: heading font, focus outline, reduced motion, the carousel, blog post body (`.post-body`) | `resources/css/app.css` | Everything else is Tailwind classes in the templates. |
+
+### Design system
+
+A **working design direction** to show the client, not the final brand: Made
+Easy's own logo and colours are still pending. To change it, edit
+`tailwind.config.js`, then rebuild.
+
+| Token | Value | Use it for |
+| --- | --- | --- |
+| `ink` | `#151313` | Text, borders, dark buttons. Use opacity for softer text: `text-ink/70`. |
+| `accent` (orange scale, `accent` = `accent-500`) | `#ff5734` | **The one dominant colour: primary actions.** Orange backgrounds always take `text-ink` (white on orange fails contrast). For orange *text* on white, use `text-accent-700` or darker. |
+| `secondary` (purple) | `#be94f5` | Sparingly. Used once on the homepage (the Maths tutorials panel). |
+| `highlight` (yellow) | `#fccc42` | Sparingly. The hero illustration's backdrop and the "Not sure where to start?" box. |
+| `surface` | `#f7f7f5` | The page background. |
+| `brand-*` | same orange scale as `accent` | Older templates (order page, result checker, Updates, …) use `brand-*`. It's kept as an alias so the whole site matches. When Made Easy's real colour arrives, changing `orange_scale` changes both. |
+| `shadow-pop` / `shadow-pop-sm` | hard 4px / 2px ink shadow | Clickable cards and primary buttons only. |
+| `font-display` | Kodchasan, self-hosted in `resources/fonts/kodchasan/` | Headings. `h1`–`h3` get it automatically from `app.css`. **Never use it for prices**: its ₦ looks like ₳. |
+| `font-sans` | Figtree, then the system font | Body text. Public pages don't load the Figtree file, so they show the system font (Segoe UI, Roboto, …). |
+| `animate-rise-in` | 500ms fade and slide up | The homepage hero only. Always write it as `motion-safe:animate-rise-in`. |
+
+**Illustrations** are free [unDraw](https://undraw.co) SVGs, recoloured to the
+palette (purple → orange, dark → ink, and a darker skin tone), in
+`resources/images/illustrations/`. They're shown with
+`<x-public.illustration name="hero-requests" />`. To add one:
+
+1. Download the SVG from unDraw.
+2. Replace `#6c63ff` with `#ff5734`.
+3. Save it in that folder.
+4. Add its width and height to the list in `components/public/illustration.blade.php`.
+
+Use illustrations only for the hero and genuinely empty lists. Cards get icons
+(`components/public/category-icon.blade.php`) instead.
+
+**Accessibility built in:** every focused link or button gets a 3px ink outline
+(white in the dark footer), set in `app.css`. Users who ask their device for
+reduced motion get no animation.
 
 ---
 
@@ -123,10 +158,10 @@ Controllers are in `app/Http/Controllers/`. All URLs are listed in
 
 | Section | What to edit | Shows when |
 | --- | --- | --- |
-| **Hero**: headline "Making Your Educational Journey Easier", intro paragraph, 4 buttons | the first `<section>` in the file. Button targets are the `:href` values. | always |
-| **Trust figure** ("Students assisted") | number and label: Site settings | only once a figure is set |
+| **Hero**: topic tags ("Exam registration", …), headline "Making Your Educational Journey Easier", intro paragraph, 4 buttons, illustration on a yellow panel | the first `<section>` in the file. Button targets are the `:href` values. The headline, paragraph and button labels are the client's wording from the requirements PDF, and `PublicPagesTest` checks them. | always |
+| **Stat badges** in the hero | "Students assisted" number and label: Site settings. "Services available online" and "service categories" are counted from the live categories (`$categories`). | each stat only when it has a real number |
 | **How it works** (3 numbered steps) | the `@foreach ([...])` list of `title` / `body` | always |
-| **Our services** (category cards) | cards come from the database (categories with an active service) | always (a "coming soon" line if there are none) |
+| **Our services**: swipeable category cards (icon, name, description, service count) | cards come from the database (categories with an active service). The row is CSS scroll snap (`.carousel` in `app.css`), with no JavaScript. Icons: `components/public/category-icon.blade.php`. | always (a "coming soon" line if there are none) |
 | **Latest Updates** (3 newest posts) | posts in the back office; card layout in `components/public/post-card.blade.php` | once a post is published |
 | **Maths tutorials** promo box | text in this file; link goes to `/maths-tutoring` | always |
 | **What our customers say** (3 testimonials) | approved testimonials; card in `components/public/testimonial-card.blade.php` | once one is approved |
@@ -144,6 +179,10 @@ Controllers are in `app/Http/Controllers/`. All URLs are listed in
 | `status-badge.blade.php` | the coloured order-status pill (colours per status are here) |
 | `post-card.blade.php` | an Updates post preview |
 | `testimonial-card.blade.php` | one testimonial |
+| `stat.blade.php` | a stat badge (bold number + label) inside a `<dl>`: homepage hero and dashboard summary. Only real figures. |
+| `empty-state.blade.php` | "nothing here yet" panel: optional illustration, title, short text and one next step (`<x-slot:action>`) |
+| `illustration.blade.php` | one unDraw SVG from `resources/images/illustrations/` |
+| `category-icon.blade.php` | the icon on a category card, picked by slug (new categories get a generic icon until one is added here) |
 
 `resources/views/partials/public/faq-list.blade.php` draws the FAQ list (homepage and /faq).
 
@@ -156,7 +195,7 @@ These use a different frame from the public pages.
 | Page | URL | Template |
 | --- | --- | --- |
 | Log in, Register, Forgot / Reset password, Verify email, Confirm password | `/login`, `/register`, `/forgot-password`, … | `resources/views/livewire/pages/auth/*.blade.php`, in the frame `resources/views/layouts/guest.blade.php` (logo: `components/application-logo.blade.php`) |
-| **My Requests** dashboard | `/my-requests` | `resources/views/account/dashboard.blade.php` + its parts in `account/partials/` (`requests`, `order-card`, `payments`, `pins`, `consultations`, `documents`, `messages`) |
+| **My Requests** dashboard | `/my-requests` | `resources/views/account/dashboard.blade.php` + its parts in `account/partials/` (`requests`, `order-card`, `payments`, `pins`, `consultations`, `documents`, `messages`). The four summary stat badges at the top use `$tab_counts`, the same numbers as the tab badges. The Requests, Consultations and Documents tabs show an illustration when they're empty. |
 | Profile (name, email, password, delete account) | `/profile` | `resources/views/profile.blade.php` + `livewire/profile/*.blade.php`, in the frame `layouts/app.blade.php` with the menu `livewire/layout/navigation.blade.php` |
 | "Forbidden" error page | any 403 | `resources/views/errors/403.blade.php` |
 
@@ -222,6 +261,10 @@ The admin panel is **Filament**, not Blade templates you edit directly.
    category by slug: `ADMISSION_CATEGORY_SLUG` / `DOCUMENTS_CATEGORY_SLUG` in `app/Support/PublicNavigation.php`.
 8. **Styling looks broken or a new class does nothing?** Rebuild (Tailwind only includes classes it finds at build time).
    Don't build class names from pieces (`'text-'.$colour`): Tailwind can't see those. Write the full class.
+   An illustration that doesn't show usually means it isn't in the build: it must sit in
+   `resources/images/` (picked up by `resources/js/app.js`), and you need to rebuild.
+   A test that compares exact HTML can fail after a restyle even though nothing changed for users:
+   `UpdatesPublicTest` checks the Updates headings' class lists. Read the failure before changing code.
 9. **Clear cached views and config** if behaviour seems stale:
    `docker compose exec app php artisan optimize:clear`.
 10. **Run the tests** after a change (README → Tests). The test name usually tells you what broke.
