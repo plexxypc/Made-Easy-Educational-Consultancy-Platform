@@ -108,6 +108,7 @@ class OrderTrackingController extends Controller
             'needs_action_note' => $order->status === OrderStatus::NeedsAction ? $order->needsActionNote() : null,
             'can_download' => TrackedOrders::is_owner($request, $order),
             'receipt' => $order->receipt,
+            'accepts_testimonial' => $order->acceptsTestimonial(),
             'upload_rules' => config('madeeasy.uploads'),
             'max_documents' => RespondToOrderRequest::MAX_DOCUMENTS,
         ])->header('Cache-Control', 'private, no-store');

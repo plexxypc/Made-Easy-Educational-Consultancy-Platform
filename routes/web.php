@@ -7,10 +7,13 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderDocumentController;
 use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\OrderTrackingController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ResultCheckerController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\ServiceCatalogueController;
 use App\Http\Controllers\ServiceRequestController;
+use App\Http\Controllers\TestimonialController;
 use App\Http\Controllers\UpdatesController;
 use App\Livewire\Hello;
 use Illuminate\Support\Facades\Route;
@@ -84,8 +87,22 @@ Route::get('updates/{slug}', [UpdatesController::class, 'show'])
     ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
     ->name('updates.show');
 
-Route::view('about', 'pages.about')->name('about');
+Route::get('about', [PageController::class, 'about'])->name('about');
 Route::view('contact', 'pages.contact')->name('contact');
+Route::get('faq', [PageController::class, 'faq'])->name('faq');
+// Promo only: tutoring is arranged over WhatsApp, not booked or paid here.
+Route::get('maths-tutoring', [PageController::class, 'maths_tutoring'])->name('maths-tutoring');
+
+// Testimonials: approved ones only. Submitting needs access to a completed order (TestimonialController).
+Route::get('testimonials', [TestimonialController::class, 'index'])->name('testimonials');
+Route::get('track/{order:reference}/testimonial', [TestimonialController::class, 'create'])->name('orders.testimonial');
+Route::post('track/{order:reference}/testimonial', [TestimonialController::class, 'store'])
+    ->middleware('throttle:order-responses')
+    ->name('orders.testimonial.store');
+
+// Generated so they carry the live host; public/robots.txt must not exist (Caddy would serve it instead).
+Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+Route::get('robots.txt', [SeoController::class, 'robots'])->name('robots');
 
 Route::get('hello', Hello::class)->name('hello');
 

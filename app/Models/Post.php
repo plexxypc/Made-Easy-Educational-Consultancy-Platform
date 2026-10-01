@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Posts\MakeFeaturedImageDisplayCopy;
 use App\Enums\PostStatus;
 use Database\Factories\PostFactory;
 use Filament\Forms\Components\RichEditor\Models\Concerns\InteractsWithRichContent;
@@ -35,7 +36,8 @@ use Illuminate\Support\Str;
  * @property string $slug
  * @property string|null $excerpt
  * @property string $body Rich text HTML; render with body_html().
- * @property string|null $featured_image_path Path on the public disk.
+ * @property string|null $featured_image_path Original upload, path on the public disk.
+ * @property string|null $featured_image_display_path Resized copy the site shows; see MakeFeaturedImageDisplayCopy.
  * @property string|null $featured_image_alt_text
  * @property string|null $meta_title
  * @property string|null $meta_description
@@ -79,7 +81,10 @@ class Post extends Model implements HasRichContent
     }
 
     /**
-     * A replaced or removed featured image is deleted from the public disk.
+     * A replaced or removed featured image is deleted from the public disk,
+     * and the resized display copy follows the original
+     * (MakeFeaturedImageDisplayCopy). Display copies are made synchronously
+     * on save: one image of at most 2 MB, so a queue isn't worth it.
      *
      * @return void
      */
@@ -93,11 +98,28 @@ class Post extends Model implements HasRichContent
             }
         });
 
-        static::deleted(function (Post $post): void {
-            if (filled($post->featured_image_path)) {
-                Storage::disk('public')->delete($post->featured_image_path);
+        static::saved(function (Post $post): void {
+            if ($post->needsDisplayImage()) {
+                app(MakeFeaturedImageDisplayCopy::class)->handle($post);
             }
         });
+
+        static::deleted(function (Post $post): void {
+            Storage::disk('public')->delete(array_filter([$post->featured_image_path, $post->featured_image_display_path]));
+        });
+    }
+
+    /**
+     * Whether the display copy is missing or belongs to an older image.
+     * A post whose copy couldn't be made (NULL) is retried on every save.
+     *
+     * @return bool
+     */
+    public function needsDisplayImage(): bool
+    {
+        $expected = filled($this->featured_image_path) ? MakeFeaturedImageDisplayCopy::path_for($this->featured_image_path) : null;
+
+        return $this->featured_image_display_path !== $expected;
     }
 
     /**
@@ -229,11 +251,16 @@ class Post extends Model implements HasRichContent
     }
 
     /**
+     * Public URL of the featured image: the resized copy when there is one,
+     * else the original upload.
+     *
      * @return string|null
      */
     public function featuredImageUrl(): ?string
     {
-        return filled($this->featured_image_path) ? Storage::disk('public')->url($this->featured_image_path) : null;
+        $path = $this->featured_image_display_path ?? $this->featured_image_path;
+
+        return filled($path) ? Storage::disk('public')->url($path) : null;
     }
 
     /**

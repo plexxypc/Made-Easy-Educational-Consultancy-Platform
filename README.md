@@ -129,6 +129,9 @@ docker compose exec app php artisan db:seed --force    # production
   have price 0.
 - `PostCategorySeeder` seeds the 12 Updates categories from PDF section 10
   (JAMB News … NIN/JAMB Information). It only creates missing ones.
+- `FaqSeeder` seeds 7 FAQs for PDF section 13. **The wording is drafted**
+  (the PDF text wasn't available), so review it in Website → FAQ before
+  go-live. It only adds questions that are missing, so edits are kept.
 - `TestUsersSeeder` seeds the staff/admin/customer test accounts above. It is
   skipped in production.
 - `AdmissionSampleDataSeeder` seeds **SAMPLE** course search data: 11 real
@@ -194,7 +197,7 @@ They use the `<x-public-layout>` component. The nav comes from
 
 | URL | Page |
 | --- | --- |
-| `/` | Homepage: PDF headline and buttons, plus live categories that have active services |
+| `/` | Homepage: PDF headline and buttons, the "students assisted" figure (once set), live categories, latest updates, maths tutorials promo, approved testimonials and the first 4 FAQs |
 | `/services` | All categories with active services and prices |
 | `/services/{category}` | One category (Admission = `admission-services`, Documents = `document-services`) |
 | `/services/{category}/{service}` | Service detail and the **Request this service** form |
@@ -205,9 +208,14 @@ They use the `<x-public-layout>` component. The nav comes from
 | `/updates/{slug}` | One published post, with its meta title and description as the page `<title>` and `<meta>` |
 | `/updates/preview/{id}` | Staff/admin preview of a draft or scheduled post: expiring signed link (24 hours) **and** a staff/admin sign-in; `noindex` |
 | `/admission/course-search` | **Course & cut-off search** (PDF section 11): JAMB score, O'Level credits, course, state, all optional; informational, links to Admission Guidance |
-| `/about`, `/contact` | About (placeholder copy) and Contact |
+| `/about`, `/contact` | About (text from Site settings) and Contact |
+| `/faq` | All active FAQs, with schema.org `FAQPage` structured data (JSON-LD) |
+| `/testimonials` | Approved testimonials only |
+| `/maths-tutoring` | Online Mathematics tutorials (PDF section 12): arranged on WhatsApp, not booked or paid here. Linked from the homepage, the services page and the footer |
+| `/sitemap.xml`, `/robots.txt` | Generated (current host). The sitemap lists public pages, categories with active services, active services, Updates categories and published posts |
 | `/track` | **Track your request**: reference plus the email or phone used |
-| `/track/{reference}` | Order page: status, answers, documents, messages, **Pay now**, receipt and the needs-action response form |
+| `/track/{reference}` | Order page: status, answers, documents, messages, **Pay now**, receipt, the needs-action response form and, once completed, **Share your experience** |
+| `/track/{reference}/testimonial` | Testimonial form: completed orders only, same access as the order page, once per order |
 | `/track/{reference}/receipt` | Payment receipt PDF, opened in the browser; `?download=1` saves it as `receipt-MER-000042.pdf` |
 | `/track/{reference}/payment/return` | Where Paystack sends the customer back; display only |
 | `POST /webhooks/paystack` | Paystack webhook (signature-checked, CSRF-exempt) |
@@ -416,7 +424,10 @@ With `LOG_CHANNEL=stderr` and `MAIL_MAILER=log`, emails appear in
 | Consultations: Availability | admin | Add one slot or a weekly pattern; cancel a slot (booked customers emailed); delete never-booked slots |
 | Updates: Posts | staff write, admin publishes | Rich text, featured image with alt text, category, auto-slug, SEO fields, publish date/time; list shows Published / Scheduled / Draft; **Preview** on unpublished posts |
 | Course search: Cut-off marks | staff, admin | Import CSV (all or nothing), download template, add/edit single rows; bulk delete admin only |
-| Course search: Institutions / Courses | staff, admin | Plain CRUD; delete only once nothing uses them |
+| Course search: Institutions / Courses | staff, admin | Plain CRUD; delete only once nothing uses them. Institutions have **aliases** ("also known as") for the CSV import |
+| Website: Testimonials | staff, admin | Opens on those waiting for review; Approve / Reject (also in bulk); add one received elsewhere; delete admin only. Menu badge = pending count |
+| Website: FAQ | admin (staff read-only) | Question, answer, shown on/off, drag to reorder; live at once |
+| Website: Site settings | admin | Homepage "students assisted" figure and wording, About Us text; live at once |
 
 **Updates posts** (`App\Models\Post`, `PostPolicy`):
 
@@ -437,6 +448,17 @@ With `LOG_CHANNEL=stderr` and `MAIL_MAILER=log`, emails appear in
   `BLOG_IMAGE_MAX_KILOBYTES` (default 2 MB), with the type checked from the
   contents. SVG is refused. A replaced or deleted featured image is removed
   from disk. A featured image needs alt text, which is used on the post page.
+- **Featured image copies.** On save, `MakeFeaturedImageDisplayCopy` (GD)
+  writes a WebP copy at most 1200px wide, at quality 80, under
+  `posts/featured/display/`. The site serves that copy, and the original upload
+  is kept. If no copy can be made (GD missing, an unreadable image, or more than
+  25 megapixels), the original is served and a warning is logged. For posts
+  saved before this existed, run
+  `docker compose exec app php artisan posts:make-display-images` once.
+  Images inside the post body are **not** resized.
+- **Slugs of published posts** no longer follow the title. Editing one shows a
+  red warning, and saving sends a notification naming the old address. There
+  are no redirects, so old links break.
 
 **Course search data** (`Institution`, `Course`, `AdmissionRequirement`).
 CSV import (`App\Actions\Admissions\ImportAdmissionRequirements`):
@@ -452,8 +474,12 @@ CSV import (`App\Actions\Admissions\ImportAdmissionRequirements`):
 - **All or nothing.** Any bad line rejects the file, and the problems are
   listed by line number (line 1 is the header).
 - Institutions and courses are **matched by name**, ignoring case and extra
-  spaces, and are created if new. Abbreviations are not matched: "UNILAG" is
-  a different institution from "University of Lagos".
+  spaces, and are created if new. An institution also matches any of its
+  **aliases** (set on the institution, e.g. "UNILAG" for "University of
+  Lagos"), so a file mixing both spellings updates one institution. The same
+  course under both spellings is reported as a duplicate. Other abbreviations
+  still create a new institution, so add them as aliases first. An alias can't
+  be another institution's name or alias. Courses have no aliases.
 - An institution and course that are already listed get the new cut-off mark
   and credits. The same pair twice in one file is an error.
 - A new institution with no type, ownership or state is still created, and the
@@ -559,6 +585,15 @@ docker run --rm --network madeeasy_internal \
   -v "$PWD:/var/www/html" -v madeeasy_test_vendor:/var/www/html/vendor \
   --user root --entrypoint sh madeeasy-app:latest -c "php artisan test"
 ```
+
+**One Postgres run at a time per database.** Two runs against the same test
+database break each other: one run's `migrate:fresh` drops tables while the
+other is creating or using them. `RefreshDatabase` then retries the migration
+on every following test, so almost the whole suite fails. `tests/TestCase.php`
+prevents this with a Postgres advisory lock. A second run prints "Another test
+run is using the "madeeasy_test" database; waiting…" and starts when the first
+finishes (it gives up after 20 minutes). To run in parallel, give each run its
+own `DB_DATABASE`.
 
 ## First deploy: Hostinger VPS checklist
 

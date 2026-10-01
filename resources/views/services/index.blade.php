@@ -1,7 +1,11 @@
-<x-public-layout title="Our Services">
+<x-public-layout
+    title="Our Services"
+    description="All Made Easy services with prices: WAEC, NECO, GCE and NABTEB registration, JAMB services, admission guidance, result checkers and document services."
+>
     <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">Our Services</h1>
         <p class="mt-3 max-w-2xl text-slate-700">Choose a category to see prices and send a request. All prices are in Naira (₦).</p>
+        <p class="mt-2 max-w-2xl text-slate-700">Looking for Maths lessons? See our <a href="{{ route('maths-tutoring') }}" class="font-semibold text-brand-700 underline">online Mathematics tutorials</a>.</p>
 
         @forelse ($categories as $category)
             <section class="mt-10" aria-labelledby="category-{{ $category->slug }}">

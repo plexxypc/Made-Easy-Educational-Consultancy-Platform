@@ -9,9 +9,11 @@ use App\Filament\Resources\Institutions\Pages\ManageInstitutions;
 use App\Filament\Support\NameKeyInput;
 use App\Models\Institution;
 use BackedEnum;
+use Closure;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -55,7 +57,33 @@ class InstitutionResource extends Resource
         return $schema
             ->columns(2)
             ->components([
-                NameKeyInput::make(Institution::class)->columnSpanFull(),
+                NameKeyInput::make(Institution::class)
+                    ->columnSpanFull()
+                    ->rule(fn (?Institution $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
+                        $owner = Institution::by_alias_key()[Institution::name_key((string) $value)] ?? null;
+
+                        if ($owner !== null && $owner->id !== $record?->id) {
+                            $fail("That name is already an alias of {$owner->name}.");
+                        }
+                    }),
+                TagsInput::make('aliases')
+                    ->label('Also known as')
+                    ->placeholder('Add an alias, e.g. UNILAG')
+                    ->helperText('Abbreviations or other names this institution appears under. Used only when matching names in the CSV import, so "UNILAG" lines update this institution instead of creating a new one.')
+                    ->splitKeys(['Tab', ','])
+                    ->nestedRecursiveRules(['string', 'max:255'])
+                    ->rule(fn (?Institution $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
+                        foreach ((array) $value as $alias) {
+                            $owner = Institution::claiming_name((string) $alias, $record?->id);
+
+                            if ($owner !== null) {
+                                $fail("\"{$alias}\" is already used by {$owner->name}.");
+
+                                return;
+                            }
+                        }
+                    })
+                    ->columnSpanFull(),
                 Select::make('type')
                     ->options(InstitutionType::class)
                     ->required(),
@@ -81,6 +109,7 @@ class InstitutionResource extends Resource
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
+                    ->description(fn (Institution $record): ?string => $record->aliases ? 'Also: '.implode(', ', $record->aliases) : null)
                     ->wrap(),
                 TextColumn::make('type')
                     ->placeholder('Not set')

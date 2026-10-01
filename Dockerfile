@@ -10,7 +10,8 @@
 FROM php:8.4-fpm-alpine AS php_base
 
 COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_pgsql pgsql intl zip bcmath opcache pcntl exif \
+# gd: resized copies of blog featured images (JPEG/PNG/WebP in, WebP out).
+RUN install-php-extensions pdo_pgsql pgsql intl zip bcmath opcache pcntl exif gd \
     && apk add --no-cache fcgi
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

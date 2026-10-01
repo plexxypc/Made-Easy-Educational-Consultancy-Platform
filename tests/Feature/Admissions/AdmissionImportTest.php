@@ -323,6 +323,65 @@ class AdmissionImportTest extends TestCase
     }
 
     /**
+     * An alias ("UNILAG") updates the existing institution instead of
+     * creating a duplicate, and the alias and real name in one file count as
+     * the same institution (so the same course twice is caught).
+     *
+     * @return void
+     */
+    public function test_institution_aliases_match_on_import(): void
+    {
+        $unilag = Institution::factory()->create(['name' => 'University of Lagos', 'aliases' => [' unilag ', 'UNILAG', 'University of Lagos', '']]);
+        $this->assertSame(['unilag'], $unilag->refresh()->aliases);
+
+        $result = $this->import("institution,course,cut_off_mark,olevel_credits_required\nUnilag,Law,280,5\nUniversity of Lagos,Medicine,290,5");
+
+        $this->assertSame(0, $result['institutions_created']);
+        $this->assertSame(1, Institution::query()->count());
+        $this->assertSame(2, $unilag->admissionRequirements()->count());
+
+        $this->assertRejected(
+            "institution,course,cut_off_mark,olevel_credits_required\nUNILAG,Law,281,5\nuniversity of lagos,Law,282,5",
+            'Line 3:',
+        );
+        $this->assertSame(280, $unilag->admissionRequirements()->whereHas('course', fn ($query) => $query->where('name', 'Law'))->sole()->cut_off_mark);
+    }
+
+    /**
+     * The admin form refuses an alias another institution already uses as
+     * its name or alias, and a name that is another institution's alias.
+     *
+     * @return void
+     */
+    public function test_aliases_cannot_collide_in_the_admin_form(): void
+    {
+        $this->actingAs($this->staff_user);
+        $unilag = Institution::factory()->create(['name' => 'University of Lagos', 'aliases' => ['UNILAG']]);
+        $lasu = Institution::factory()->create(['name' => 'Lagos State University']);
+        $details = ['type' => 'university', 'ownership' => 'state', 'state' => 'lagos'];
+
+        foreach ([['unilag'], ['University of LAGOS']] as $aliases) {
+            Livewire::test(ManageInstitutions::class)
+                ->callAction(TestAction::make('edit')->table($lasu), ['name' => 'Lagos State University', 'aliases' => $aliases] + $details)
+                ->assertHasActionErrors(['aliases']);
+        }
+
+        Livewire::test(ManageInstitutions::class)
+            ->callAction('create', ['name' => 'Unilag'] + $details)
+            ->assertHasActionErrors(['name']);
+
+        Livewire::test(ManageInstitutions::class)
+            ->callAction(TestAction::make('edit')->table($lasu), ['name' => 'Lagos State University', 'aliases' => ['LASU']] + $details)
+            ->assertHasNoActionErrors();
+        Livewire::test(ManageInstitutions::class)
+            ->callAction(TestAction::make('edit')->table($unilag), ['name' => 'University of Lagos', 'aliases' => ['UNILAG', 'Unilag Akoka']] + $details)
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(['LASU'], $lasu->refresh()->aliases);
+        $this->assertSame(['UNILAG', 'Unilag Akoka'], $unilag->refresh()->aliases);
+    }
+
+    /**
      * @param  string  $csv
      * @return array<string, mixed>
      */

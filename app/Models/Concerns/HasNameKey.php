@@ -9,7 +9,8 @@ use Illuminate\Support\Str;
  * Keeps a `name_key` column (unique) in step with `name`, so records are
  * matched by name regardless of case and spacing. Assumption: names that
  * differ only in case or spacing are the same institution/course; spelling
- * variants and abbreviations ("UNILAG") are NOT matched.
+ * variants and abbreviations ("UNILAG") are only matched where an
+ * institution lists them as aliases (CSV import only).
  *
  * @mixin Model
  */

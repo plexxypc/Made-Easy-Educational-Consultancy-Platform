@@ -533,6 +533,28 @@ class Order extends Model
     }
 
     /**
+     * The customer's testimonial for this order, if they left one.
+     *
+     * @return HasOne<Testimonial, $this>
+     */
+    public function testimonial(): HasOne
+    {
+        return $this->hasOne(Testimonial::class);
+    }
+
+    /**
+     * Whether the customer may now share their experience: the order is
+     * completed and has no testimonial yet (one per order, whatever its
+     * moderation outcome, so a rejected one can't be resubmitted endlessly).
+     *
+     * @return bool
+     */
+    public function acceptsTestimonial(): bool
+    {
+        return $this->status === OrderStatus::Completed && ! $this->testimonial()->exists();
+    }
+
+    /**
      * Service name with the quantity, e.g. "WAEC Result Checker × 3".
      *
      * @return string

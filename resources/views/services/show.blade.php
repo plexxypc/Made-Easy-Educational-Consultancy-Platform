@@ -1,7 +1,11 @@
 @php($is_quote = $service->fulfilment_type === \App\Enums\FulfilmentType::Quote)
 @php($input_classes = 'block min-h-[48px] w-full rounded-xl border-slate-300 text-base shadow-sm focus:border-brand-500 focus:ring-brand-500')
 
-<x-public-layout :title="$service->name" :description="$service->description">
+<x-public-layout
+    :title="$service->name"
+    :description="$service->description"
+    :whatsapp-message="\App\Support\WhatsApp::service_message($service->name)"
+>
     <section class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <nav aria-label="Breadcrumb" class="text-sm text-slate-500">
             <a href="{{ route('services.index') }}" class="hover:underline">Services</a>

@@ -1,4 +1,4 @@
-{{-- One request on the dashboard. $order: Order with service, consultationBooking.slot, receipt. --}}
+{{-- One request on the dashboard. $order: Order with service, consultationBooking.slot, receipt, testimonial_exists. --}}
 <li class="rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-brand-300 hover:shadow">
     <a href="{{ route('orders.track.show', $order) }}" class="flex flex-wrap items-center justify-between gap-3 p-5">
         <span>
@@ -26,6 +26,11 @@
         <div class="border-t border-slate-100 px-5 py-3 text-sm text-slate-600">
             Paid {{ $order->receipt->amount_label }} ·
             <a href="{{ route('orders.receipt', $order) }}" class="font-semibold text-brand-700 underline">Receipt {{ $order->receipt->number }}</a>
+        </div>
+    @endif
+    @if ($order->status === \App\Enums\OrderStatus::Completed && ! $order->testimonial_exists)
+        <div class="border-t border-slate-100 px-5 py-3 text-sm">
+            <a href="{{ route('orders.testimonial', $order) }}" class="font-semibold text-brand-700 underline">Share your experience</a>
         </div>
     @endif
 </li>

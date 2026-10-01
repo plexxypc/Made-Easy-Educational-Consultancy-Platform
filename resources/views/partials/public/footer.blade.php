@@ -23,10 +23,14 @@
                     <li><a href="{{ $item['url'] }}" class="text-slate-700 hover:text-brand-700 hover:underline">{{ $item['label'] }}</a></li>
                 @endforeach
                 <li><a href="{{ route('orders.track') }}" class="text-slate-700 hover:text-brand-700 hover:underline">Track your request</a></li>
+                <li><a href="{{ route('maths-tutoring') }}" class="text-slate-700 hover:text-brand-700 hover:underline">Maths tutorials</a></li>
+                <li><a href="{{ route('faq') }}" class="text-slate-700 hover:text-brand-700 hover:underline">FAQ</a></li>
+                <li><a href="{{ route('testimonials') }}" class="text-slate-700 hover:text-brand-700 hover:underline">Testimonials</a></li>
             </ul>
         </div>
     </div>
-    <div class="border-t border-slate-100 py-4 text-center text-xs text-slate-500">
+    {{-- Bottom padding keeps the floating WhatsApp button from covering this line. --}}
+    <div class="border-t border-slate-100 pb-24 pt-4 text-center text-xs text-slate-500 sm:pb-4">
         &copy; {{ now()->year }} {{ $contact['business_name'] }}
     </div>
 </footer>

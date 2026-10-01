@@ -225,18 +225,25 @@ class PostAdminTest extends TestCase
         $this->assertStringStartsWith(Post::IMAGE_DIRECTORY.'/', $first_path);
         Storage::disk('public')->assertExists($first_path);
         Storage::disk('local')->assertMissing($first_path);
-        $this->assertSame(Storage::disk('public')->url($first_path), $post->featuredImageUrl());
+        // The site shows the resized copy (FeaturedImageResizeTest); the original is kept.
+        $first_display_path = $post->featured_image_display_path;
+        $this->assertNotNull($first_display_path);
+        $this->assertSame(Storage::disk('public')->url($first_display_path), $post->featuredImageUrl());
 
         $post->forceFill(['published_at' => now()->subMinute()])->save();
         $this->get($post->publicUrl())->assertOk()->assertSee($post->featuredImageUrl(), false);
         $this->get(route('updates'))->assertSee($post->featuredImageUrl(), false);
 
-        // Replacing the image deletes the old file; deleting the post deletes the image.
+        // Replacing the image deletes the old file and its copy. This one isn't a
+        // readable image, so no copy is made and the original is shown instead.
         $new_path = Post::IMAGE_DIRECTORY.'/'.Str::random(40).'.png';
         Storage::disk('public')->put($new_path, 'png');
         $post->update(['featured_image_path' => $new_path]);
         Storage::disk('public')->assertMissing($first_path);
+        Storage::disk('public')->assertMissing($first_display_path);
         Storage::disk('public')->assertExists($new_path);
+        $this->assertNull($post->refresh()->featured_image_display_path);
+        $this->assertSame(Storage::disk('public')->url($new_path), $post->featuredImageUrl());
 
         $post->delete();
         Storage::disk('public')->assertMissing($new_path);
@@ -269,7 +276,7 @@ class PostAdminTest extends TestCase
     }
 
     /**
-     * A real 1x1 PNG (the app image has no GD for UploadedFile::fake()->image()).
+     * A real 1x1 PNG, built without GD so the upload rules are tested on their own.
      *
      * @param  string  $name
      * @return UploadedFile

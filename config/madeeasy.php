@@ -133,6 +133,11 @@ return [
         'image_max_kilobytes' => (int) env('BLOG_IMAGE_MAX_KILOBYTES', 2048),
         'image_mime_types' => ['image/jpeg', 'image/png', 'image/webp'],
         'preview_link_minutes' => 24 * 60,
+        // Featured images are shown from a resized WebP copy (the original is kept).
+        'display_image_max_width' => 1200,
+        'display_image_quality' => 80,
+        // Larger images are served as uploaded rather than decoded (GD needs ~4 bytes per pixel).
+        'display_image_max_pixels' => 25_000_000,
     ],
 
     /*

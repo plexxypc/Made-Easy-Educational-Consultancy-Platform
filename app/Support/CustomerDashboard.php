@@ -275,6 +275,7 @@ class CustomerDashboard
     {
         return $this->orders_query()
             ->with(['service', 'consultationBooking.slot', 'receipt'])
+            ->withExists('testimonial')
             ->latest()
             ->latest('id');
     }

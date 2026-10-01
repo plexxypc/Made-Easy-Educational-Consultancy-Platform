@@ -1,7 +1,11 @@
 {{-- All contact details come from config('madeeasy.contact'), set in .env. Don't hardcode them here. --}}
 @php($contact = config('madeeasy.contact'))
+@php($whatsapp_url = \App\Support\WhatsApp::link())
 
-<x-public-layout title="Contact">
+<x-public-layout
+    title="Contact"
+    description="Call, WhatsApp or email Made Easy Educational Consultancy about exam registration, admission, result checkers and documents."
+>
     <section class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">Contact Us</h1>
         <p class="mt-3 text-lg text-slate-700">Call, send a WhatsApp message or email us. If you've already sent a request, please have your reference number ready.</p>
@@ -19,7 +23,13 @@
             </div>
             <div class="px-5 py-4">
                 <dt class="text-sm font-semibold uppercase tracking-wide text-slate-500">WhatsApp</dt>
-                <dd class="mt-1 text-lg font-semibold text-slate-900">{{ $contact['whatsapp'] }}</dd>
+                <dd class="mt-1">
+                    @if ($whatsapp_url)
+                        <a href="{{ $whatsapp_url }}" target="_blank" rel="noopener" class="inline-flex min-h-[44px] items-center text-lg font-semibold text-brand-700 hover:underline">{{ $contact['whatsapp'] }}</a>
+                    @else
+                        <span class="text-lg font-semibold text-slate-900">{{ $contact['whatsapp'] }}</span>
+                    @endif
+                </dd>
             </div>
             <div class="px-5 py-4">
                 <dt class="text-sm font-semibold uppercase tracking-wide text-slate-500">Email</dt>

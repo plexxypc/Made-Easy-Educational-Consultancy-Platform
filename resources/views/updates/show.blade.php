@@ -7,6 +7,7 @@
     :description="$post->seoDescription()"
     :canonical-url="$is_preview ? null : $post->publicUrl()"
     :og-image="$post->featuredImageUrl()"
+    og-type="article"
     :noindex="$is_preview"
 >
     @if ($is_preview)

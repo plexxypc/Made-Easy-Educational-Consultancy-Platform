@@ -1,6 +1,10 @@
 @php($input_classes = 'block w-full rounded-xl border-slate-300 text-base shadow-sm focus:border-brand-500 focus:ring-brand-500')
 
-<x-public-layout :title="'Request '.$order->display_reference">
+<x-public-layout
+    :title="'Request '.$order->display_reference"
+    :noindex="true"
+    :whatsapp-message="\App\Support\WhatsApp::order_message($order->display_reference)"
+>
     <section class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         @if ($can_download)
             <a href="{{ route('my-requests') }}" class="text-sm text-slate-500 hover:underline">&larr; My Requests</a>
@@ -135,6 +139,17 @@
         @error('payment')
             <div class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800" role="alert">{{ $message }}</div>
         @enderror
+
+        {{-- Completed orders only, once per order (Order::acceptsTestimonial). --}}
+        @if ($accepts_testimonial)
+            <section class="mt-6 flex flex-col gap-4 rounded-2xl border border-accent-200 bg-accent-50 p-5 sm:flex-row sm:items-center sm:justify-between" aria-labelledby="testimonial-heading">
+                <div>
+                    <h2 id="testimonial-heading" class="text-lg font-bold text-slate-900">How did we do?</h2>
+                    <p class="mt-1 text-slate-700">A few words about your experience help other students and parents choose with confidence.</p>
+                </div>
+                <x-public.button :href="route('orders.testimonial', $order)" variant="accent">Share your experience</x-public.button>
+            </section>
+        @endif
 
         @if ($receipt)
             <section class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5" aria-labelledby="payment-heading">

@@ -1,4 +1,7 @@
-<x-public-layout>
+<x-public-layout
+    meta-title="Made Easy Educational Consultancy | WAEC, NECO, JAMB & Admission Services"
+    description="WAEC and NECO registration, JAMB services, admission guidance, result checker PINs and certificate processing. Request online and track your progress."
+>
     {{-- Hero: headline and description verbatim from the requirements PDF, section 1. --}}
     <section class="bg-gradient-to-b from-brand-50 to-slate-50">
         <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-20">
@@ -21,7 +24,15 @@
         </div>
     </section>
 
-    {{-- PLACEHOLDER (PDF section 16): trust indicator, e.g. "100+ Students Assisted With Admission". Needs a client-confirmed figure. --}}
+    {{-- PDF section 16: trust indicator from Site settings. Hidden until an admin enters a confirmed figure. --}}
+    @if (filled($students_assisted))
+        <section class="mx-auto max-w-6xl px-4 pt-10 sm:px-6" aria-label="Our track record">
+            <p class="flex flex-col items-center rounded-2xl border border-brand-100 bg-white px-5 py-6 text-center shadow-sm sm:flex-row sm:justify-center sm:gap-4">
+                <span class="text-4xl font-extrabold text-brand-700">{{ $students_assisted }}</span>
+                <span class="mt-1 text-lg font-semibold text-slate-800 sm:mt-0">{{ $students_assisted_label }}</span>
+            </p>
+        </section>
+    @endif
 
     {{-- How it works --}}
     <section class="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -81,9 +92,42 @@
         </section>
     @endif
 
-    {{-- PLACEHOLDER (PDF section 12): Mathematics online tutorials promo with WhatsApp contact. Later prompt. --}}
+    {{-- PDF section 12: Mathematics tutorials promo. Arranged on WhatsApp; the page explains how. --}}
+    <section class="mx-auto max-w-6xl px-4 py-4 sm:px-6" aria-labelledby="maths-heading">
+        <div class="flex flex-col gap-4 rounded-2xl border border-brand-200 bg-brand-50 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 id="maths-heading" class="text-xl font-bold text-slate-900">Online Mathematics tutorials</h2>
+                <p class="mt-1 text-slate-700">Lessons for WAEC, NECO, JAMB and school exams, arranged with us directly on WhatsApp.</p>
+            </div>
+            <x-public.button :href="route('maths-tutoring')">Find out more</x-public.button>
+        </div>
+    </section>
 
-    {{-- PLACEHOLDER (PDF section 15): testimonials. Later prompt. --}}
+    {{-- PDF section 15: approved testimonials only. Hidden until one is approved. --}}
+    @if ($testimonials->isNotEmpty())
+        <section class="mx-auto max-w-6xl px-4 py-12 sm:px-6" aria-labelledby="testimonials-heading">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+                <h2 id="testimonials-heading" class="text-2xl font-bold text-slate-900">What our customers say</h2>
+                <a href="{{ route('testimonials') }}" class="text-sm font-semibold text-brand-700 hover:underline">All testimonials &rarr;</a>
+            </div>
+            <ul class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($testimonials as $testimonial)
+                    <x-public.testimonial-card :testimonial="$testimonial" />
+                @endforeach
+            </ul>
+        </section>
+    @endif
 
-    {{-- PLACEHOLDER (PDF section 13): FAQ. Later prompt. --}}
+    {{-- PDF section 13: the first few FAQs. The FAQPage structured data is on /faq only, so it isn't duplicated. --}}
+    @if ($faqs->isNotEmpty())
+        <section class="mx-auto max-w-3xl px-4 py-12 sm:px-6" aria-labelledby="faq-heading">
+            <h2 id="faq-heading" class="text-2xl font-bold text-slate-900">Frequently asked questions</h2>
+            <div class="mt-6">
+                @include('partials.public.faq-list', ['faqs' => $faqs, 'heading_tag' => 'h3'])
+            </div>
+            @if ($has_more_faqs)
+                <p class="mt-4"><a href="{{ route('faq') }}" class="font-semibold text-brand-700 hover:underline">More questions &rarr;</a></p>
+            @endif
+        </section>
+    @endif
 </x-public-layout>

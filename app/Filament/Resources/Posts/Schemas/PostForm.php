@@ -14,6 +14,8 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 
 class PostForm
@@ -45,9 +47,16 @@ class PostForm
                         Section::make()
                             ->columns(2)
                             ->schema([
-                                SlugField::name_input('title')->columnSpanFull(),
+                                SlugField::name_input('title', slug_is_locked: fn (?Model $record): bool => $record instanceof Post && $record->isPublished())
+                                    ->columnSpanFull(),
                                 SlugField::slug_input()
-                                    ->helperText('The post address: /updates/your-slug. Filled in from the title; changing it on a published post breaks old links.'),
+                                    ->live(onBlur: true)
+                                    ->hint(fn (?Model $record, ?string $state): ?string => self::slug_change_warning($record, $state))
+                                    ->hintIcon(Heroicon::ExclamationTriangle)
+                                    ->hintColor('danger')
+                                    ->helperText(fn (?Model $record): string => $record instanceof Post && $record->isPublished()
+                                        ? 'This post is live, so the address no longer follows the title. There are no redirects: changing it breaks every existing link and shared post.'
+                                        : 'The post address: /updates/your-slug. Filled in from the title until the post is published.'),
                                 Select::make('post_category_id')
                                     ->label('Category')
                                     ->relationship('category', 'name')
@@ -121,5 +130,22 @@ class PostForm
                             ]),
                     ]),
             ]);
+    }
+
+    /**
+     * Shown as soon as the slug of a published post is edited. There are no
+     * redirects, so the old address will 404 after saving.
+     *
+     * @param  Model|null  $record
+     * @param  string|null  $state  Slug currently in the form.
+     * @return string|null
+     */
+    public static function slug_change_warning(?Model $record, ?string $state): ?string
+    {
+        if (! $record instanceof Post || ! $record->isPublished() || $state === $record->slug) {
+            return null;
+        }
+
+        return "Published post: saving breaks links to /updates/{$record->slug}";
     }
 }

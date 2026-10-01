@@ -7,11 +7,45 @@ use App\Filament\Resources\Posts\PostResource;
 use App\Models\Post;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditPost extends EditRecord
 {
     protected static string $resource = PostResource::class;
+
+    /**
+     * Slug before this save, to notice a changed address on a live post.
+     */
+    protected ?string $slug_before_save = null;
+
+    /**
+     * @return void
+     */
+    protected function beforeSave(): void
+    {
+        $this->slug_before_save = $this->getRecord()->getOriginal('slug');
+    }
+
+    /**
+     * After the address of a live post changed, say plainly which link died.
+     *
+     * @return void
+     */
+    protected function afterSave(): void
+    {
+        /** @var Post $post */
+        $post = $this->getRecord();
+
+        if ($post->isPublished() && $this->slug_before_save !== null && $this->slug_before_save !== $post->slug) {
+            Notification::make()
+                ->warning()
+                ->title('Post address changed')
+                ->body("Links to /updates/{$this->slug_before_save} now show \"page not found\". Update anywhere you shared the old link.")
+                ->persistent()
+                ->send();
+        }
+    }
 
     /**
      * @return array<int, Action>

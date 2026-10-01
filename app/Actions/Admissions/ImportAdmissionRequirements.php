@@ -33,8 +33,11 @@ use Illuminate\Support\Str;
  *  - All or nothing, as for PIN stock: if any line has a problem, nothing is
  *    saved and every problem is reported by line number (line 1 = header).
  *  - Institutions and courses are matched by name, ignoring case and extra
- *    spaces (HasNameKey); unknown names are created. Abbreviations and
- *    spelling variants are NOT matched ("UNILAG" is a new institution).
+ *    spaces (HasNameKey); unknown names are created. An institution is also
+ *    matched by any of its aliases ("UNILAG" -> University of Lagos), so a
+ *    file mixing the two spellings counts them as the same institution.
+ *    Other abbreviations and spelling variants are NOT matched: add them as
+ *    aliases first, or they become new institutions. Courses have no aliases.
  *  - An institution + course already in the database is UPDATED with the
  *    new cut-off/credits (e.g. a new admission year). The same pair twice
  *    in one file is a problem.
@@ -113,6 +116,7 @@ class ImportAdmissionRequirements
             throw new AdmissionImportRejected('That file has '.count($rows)." rows; upload at most {$max_lines} at a time.");
         }
 
+        $rows = self::resolve_institution_aliases($rows);
         $institutions = self::existing_by_key(Institution::class, array_column($rows, 'institution_key'));
         $courses = self::existing_by_key(Course::class, array_column($rows, 'course_key'));
 
@@ -365,6 +369,36 @@ class ImportAdmissionRequirements
         }
 
         return $existing;
+    }
+
+    /**
+     * Point lines that use an alias at the institution's real name key, so
+     * every later step (duplicates, details, saving) sees one institution.
+     * A real name always wins over an alias; the admin form keeps the two
+     * from clashing.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private static function resolve_institution_aliases(array $rows): array
+    {
+        $by_alias = Institution::by_alias_key();
+
+        if ($by_alias === []) {
+            return $rows;
+        }
+
+        $named = self::existing_by_key(Institution::class, array_column($rows, 'institution_key'));
+
+        foreach ($rows as $line_number => $row) {
+            $key = $row['institution_key'];
+
+            if (! isset($named[$key]) && isset($by_alias[$key])) {
+                $rows[$line_number]['institution_key'] = $by_alias[$key]->name_key;
+            }
+        }
+
+        return $rows;
     }
 
     /**

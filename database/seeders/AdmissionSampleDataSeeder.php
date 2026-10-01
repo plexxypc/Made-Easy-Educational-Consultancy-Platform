@@ -41,6 +41,24 @@ class AdmissionSampleDataSeeder extends Seeder
     ];
 
     /**
+     * Common abbreviations, matched by the CSV import.
+     *
+     * @var array<string, array<int, string>>
+     */
+    private const ALIASES = [
+        'University of Lagos' => ['UNILAG'],
+        'University of Ibadan' => ['UI'],
+        'Obafemi Awolowo University' => ['OAU', 'University of Ife'],
+        'University of Nigeria, Nsukka' => ['UNN'],
+        'Ahmadu Bello University' => ['ABU', 'ABU Zaria'],
+        'Lagos State University' => ['LASU'],
+        'Yaba College of Technology' => ['YABATECH', 'Yaba Tech'],
+        'Federal Polytechnic, Ilaro' => ['FPI', 'Ilaro Poly'],
+        'Federal College of Education (Technical), Akoka' => ['FCE Akoka', 'FCET Akoka'],
+        'Adeniran Ogunsanya College of Education' => ['AOCOED'],
+    ];
+
+    /**
      * [institution, course, cut-off mark, O'Level credits]. Illustrative only.
      *
      * @var array<int, array{0: string, 1: string, 2: int, 3: int}>
@@ -109,7 +127,14 @@ class AdmissionSampleDataSeeder extends Seeder
 
         foreach (self::INSTITUTIONS as $name => [$type, $ownership, $state]) {
             $institution = Institution::query()->firstOrNew(['name_key' => Institution::name_key($name)]);
-            $institution->forceFill(['name' => $name, 'name_key' => Institution::name_key($name), 'type' => $type, 'ownership' => $ownership, 'state' => $state])->save();
+            $institution->forceFill([
+                'name' => $name,
+                'name_key' => Institution::name_key($name),
+                'aliases' => self::ALIASES[$name] ?? null,
+                'type' => $type,
+                'ownership' => $ownership,
+                'state' => $state,
+            ])->save();
             $institution_ids[$name] = $institution->id;
         }
 

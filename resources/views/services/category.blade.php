@@ -1,4 +1,8 @@
-<x-public-layout :title="$category->name" :description="$category->description">
+<x-public-layout
+    :title="$category->name"
+    :description="filled($category->description) ? $category->description : $category->name.' from Made Easy Educational Consultancy: see prices and send your request online.'"
+    :whatsapp-message="\App\Support\WhatsApp::category_message($category->name)"
+>
     <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <nav aria-label="Breadcrumb" class="text-sm text-slate-500">
             <a href="{{ route('services.index') }}" class="hover:underline">Services</a>
