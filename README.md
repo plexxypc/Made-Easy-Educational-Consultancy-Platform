@@ -7,6 +7,9 @@ bookings, Updates (blog), course search, and the Filament back office.
 **Launching?** Follow [GO-LIVE.md](GO-LIVE.md) step by step. The
 [Production](#production-hostinger-kvm-2) section below explains each step.
 
+**Editing the site?** [FRONTEND-GUIDE.md](FRONTEND-GUIDE.md) maps every page and
+section (menu, hero, footer, …) to the file or back-office screen that controls it.
+
 | Layer        | Choice                                                     |
 | ------------ | ---------------------------------------------------------- |
 | Framework    | Laravel 13 on PHP 8.4 (PHP-FPM, Alpine)                    |
