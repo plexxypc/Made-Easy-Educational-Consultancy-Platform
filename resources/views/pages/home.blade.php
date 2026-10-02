@@ -30,8 +30,8 @@
                     <x-public.button :href="route('services.index')">Explore Our Services</x-public.button>
                     <x-public.button :href="$admission_guidance_url" variant="dark">Get Admission Guidance</x-public.button>
                     <x-public.button :href="route('contact')" variant="secondary">Contact Us</x-public.button>
-                    {{-- Standalone payment arrives with Paystack (Prompt 6). Until then this goes to the catalogue. --}}
-                    <x-public.button :href="route('services.index')" variant="secondary">Make Payment</x-public.button>
+                    {{-- Standalone payment arrives with Paystack (Prompt 6). Until then this goes to the catalogue. 
+                    <x-public.button :href="route('services.index')" variant="secondary">Make Payment</x-public.button>--}}
                 </div>
 
                 {{-- PDF section 16: the trust figure from Site settings is hidden until an admin enters a confirmed one. --}}

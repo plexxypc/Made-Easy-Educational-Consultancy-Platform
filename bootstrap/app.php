@@ -35,6 +35,18 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->append(SecurityHeaders::class);
 
+        // Caddy is the only thing that can reach PHP-FPM (it never leaves the
+        // Docker network), and it talks to us over plain HTTP. Trusting its
+        // X-Forwarded-* headers is what makes url(), redirects, secure cookies
+        // and Livewire's script tag use https:// instead of http://.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
+        );
+
         // Paystack can't send a CSRF token; the webhook checks its HMAC signature instead.
         $middleware->preventRequestForgery(except: ['webhooks/paystack']);
     })

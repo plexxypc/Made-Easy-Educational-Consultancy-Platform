@@ -9,9 +9,16 @@
 
 {
 	email {$ACME_EMAIL:admin@example.com}
+
+	# A tunnel (ngrok, cloudflared) on the host terminates HTTPS and reaches
+	# Caddy over plain HTTP from the Docker gateway. Without this Caddy would
+	# replace the tunnel's X-Forwarded-Proto: https with "http".
+	servers {
+		trusted_proxies static private_ranges
+	}
 }
 
-{$SITE_ADDRESS:80} {
+{$SITE_ADDRESS:localhost} {
 	root * /var/www/html/public
 
 	encode zstd gzip
