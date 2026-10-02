@@ -64,11 +64,11 @@
                     <button type="submit" class="flex min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-ink/80 hover:bg-ink/5 hover:text-ink">Log out</button>
                 </form>
             @else
-                <a href="{{ route('orders.track') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-ink/80 hover:bg-ink/5 sm:flex">Track request</a>
+                {{--<a href="{{ route('orders.track') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-ink/80 hover:bg-ink/5 sm:flex">Track request</a>--}}
                 <a href="{{ route('login') }}" class="hidden min-h-[44px] items-center whitespace-nowrap rounded-lg border-2 border-ink bg-white px-4 text-sm font-semibold text-ink hover:bg-surface sm:flex">Log in</a>
             @endauth
 
-            {{-- Mobile/tablet navigation: native <details>, works without JavaScript --}}
+             {{--Mobile/tablet navigation: native <details>, works without JavaScript --}}
             <details class="group relative xl:hidden">
                 <summary class="flex min-h-[48px] cursor-pointer list-none items-center gap-2 rounded-lg border-2 border-ink bg-white px-4 text-sm font-semibold text-ink hover:bg-surface [&::-webkit-details-marker]:hidden">
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
