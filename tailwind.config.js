@@ -2,22 +2,61 @@ import defaultTheme from 'tailwindcss/defaultTheme';
 import forms from '@tailwindcss/forms';
 
 /**
- * Orange scale around the working-direction accent (#ff5734 at 500).
- * 700 and darker pass WCAG AA as text on white; 500 needs ink text on top.
+ * Brand palette, sampled from the Made Easy logo (public/images/logo.png).
+ *
+ * Each scale puts the logo colour at 500 and is generated from it by moving HSL
+ * lightness towards white (50-400) or black (600-950), so every tint and shade
+ * stays on the same hue. Regenerate all steps together if a base colour changes.
+ *
+ * Contrast (WCAG AA): white on accent 7.6:1, accent on white 7.6:1, ink on accent
+ * only 2.3:1, so accent backgrounds take white text. Ink on secondary (6.4:1) and
+ * on highlight (7.7:1) pass; white on either fails, so those keep ink text.
  */
-const orange_scale = {
-    50: '#fff3ef',
-    100: '#ffe4db',
-    200: '#ffc6b4',
-    300: '#ffa184',
-    400: '#ff7a56',
-    500: '#ff5734',
-    600: '#ed3f1b',
-    700: '#c22f12',
-    800: '#9c2812',
-    900: '#7e2514',
-    950: '#440f06',
-    DEFAULT: '#ff5734',
+const ink = '#001848'; // deep navy: text, borders, dark buttons, the footer
+
+const blue_scale = {
+    50: '#eff4fc',
+    100: '#d7e3f8',
+    200: '#adc7f4',
+    300: '#72a0f1',
+    400: '#216df5',
+    500: '#0048c8',
+    600: '#003daa',
+    700: '#00328c',
+    800: '#00286e',
+    900: '#001d50',
+    950: '#001232',
+    DEFAULT: '#0048c8',
+};
+
+const green_scale = {
+    50: '#f6fcee',
+    100: '#e9f8d4',
+    200: '#d4f3a7',
+    300: '#b8f067',
+    400: '#97f40f',
+    500: '#68b000',
+    600: '#589600',
+    700: '#497b00',
+    800: '#396100',
+    900: '#2a4600',
+    950: '#1a2c00',
+    DEFAULT: '#68b000',
+};
+
+const gold_scale = {
+    50: '#fcf9f1',
+    100: '#f9f0dc',
+    200: '#f5e1b6',
+    300: '#f3cf80',
+    400: '#f6bb38',
+    500: '#e8a000',
+    600: '#c58800',
+    700: '#a27000',
+    800: '#805800',
+    900: '#5d4000',
+    950: '#3a2800',
+    DEFAULT: '#e8a000',
 };
 
 /** @type {import('tailwindcss').Config} */
@@ -36,20 +75,19 @@ export default {
                 display: ['Kodchasan', ...defaultTheme.fontFamily.sans],
             },
             colors: {
-                // Working design direction, not the final brand (Made Easy's logo and colours are pending).
-                // Orange is the one dominant colour for primary actions; purple and yellow are used sparingly.
-                ink: '#151313',
-                accent: orange_scale,
-                secondary: '#be94f5',
-                highlight: '#fccc42',
+                // Blue is the one dominant colour for primary actions; green and gold are used sparingly.
+                ink,
+                accent: blue_scale,
+                secondary: green_scale,
+                highlight: gold_scale,
                 surface: '#f7f7f5',
-                // Older templates use brand-*: kept as the same orange so the whole site stays consistent.
-                brand: orange_scale,
+                // Older templates use brand-*: kept as the same blue so the whole site stays consistent.
+                brand: blue_scale,
             },
             boxShadow: {
                 // Hard offset shadow for clickable cards and primary buttons (flat illustration style).
-                pop: '4px 4px 0 0 #151313',
-                'pop-sm': '2px 2px 0 0 #151313',
+                pop: `4px 4px 0 0 ${ink}`,
+                'pop-sm': `2px 2px 0 0 ${ink}`,
             },
             keyframes: {
                 'rise-in': {

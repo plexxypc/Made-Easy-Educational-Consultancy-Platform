@@ -120,7 +120,7 @@
                     @endif
 
                     <div>
-                        <button type="submit" class="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl border-2 border-ink bg-accent px-8 text-base font-semibold text-ink shadow-pop hover:bg-accent-600 sm:w-auto">
+                        <button type="submit" class="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl border-2 border-ink bg-accent px-8 text-base font-semibold text-white shadow-pop hover:bg-accent-600 sm:w-auto">
                             Send request
                         </button>
                         <p class="mt-3 text-sm text-ink/70">No payment is taken when you send this form.</p>

@@ -7,7 +7,7 @@
         <details class="group">
             <summary class="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 hover:bg-surface [&::-webkit-details-marker]:hidden">
                 <{{ $heading_tag }} class="font-sans text-base font-semibold text-ink sm:text-lg">{{ $faq->question }}</{{ $heading_tag }}>
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-ink group-open:bg-accent" aria-hidden="true">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-ink group-open:bg-accent group-open:text-white" aria-hidden="true">
                     <svg class="h-4 w-4 group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
                 </span>
             </summary>

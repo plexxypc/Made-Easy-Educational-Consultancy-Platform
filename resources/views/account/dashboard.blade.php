@@ -44,7 +44,7 @@
                         @foreach ($claimable_orders as $claimable_order)
                             <input type="hidden" name="orders[]" value="{{ $claimable_order->id }}">
                         @endforeach
-                        <button type="submit" class="inline-flex min-h-[48px] items-center justify-center rounded-xl border-2 border-ink bg-accent px-6 font-semibold text-ink shadow-pop-sm hover:bg-accent-600">
+                        <button type="submit" class="inline-flex min-h-[48px] items-center justify-center rounded-xl border-2 border-ink bg-accent px-6 font-semibold text-white shadow-pop-sm hover:bg-accent-600">
                             Yes, add {{ $claimable_orders->count() === 1 ? 'it' : 'them' }} to my account
                         </button>
                     </form>

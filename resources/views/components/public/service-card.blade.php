@@ -21,14 +21,14 @@
             {{-- Consultations are booked on /book-consultation, not through the request form. --}}
             <a
                 href="{{ route('book-consultation') }}"
-                class="inline-flex min-h-[48px] items-center rounded-xl border-2 border-ink bg-accent px-5 text-sm font-semibold text-ink shadow-pop-sm hover:bg-accent-600"
+                class="inline-flex min-h-[48px] items-center rounded-xl border-2 border-ink bg-accent px-5 text-sm font-semibold text-white shadow-pop-sm hover:bg-accent-600"
             >
                 Book a time<span class="sr-only">: {{ $service->name }}</span>
             </a>
         @else
             <a
                 href="{{ route('services.show', ['category' => $category, 'service' => $service]) }}"
-                class="inline-flex min-h-[48px] items-center rounded-xl border-2 border-ink bg-accent px-5 text-sm font-semibold text-ink shadow-pop-sm hover:bg-accent-600"
+                class="inline-flex min-h-[48px] items-center rounded-xl border-2 border-ink bg-accent px-5 text-sm font-semibold text-white shadow-pop-sm hover:bg-accent-600"
             >
                 View &amp; request<span class="sr-only">: {{ $service->name }}</span>
             </a>

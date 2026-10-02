@@ -2,9 +2,9 @@
 
 <header class="sticky top-0 z-40 border-b-2 border-ink bg-surface/95 backdrop-blur">
     <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        {{-- Placeholder mark until Made Easy's own logo is supplied. --}}
-        <a href="{{ route('home') }}" class="flex min-h-[48px] items-center gap-3 rounded-xl" aria-label="{{ config('madeeasy.contact.business_name') }}, home">
-            <span class="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-ink bg-accent font-display text-lg font-bold text-ink" aria-hidden="true">ME</span>
+        {{-- Logo emblem (public/images/logo-mark.png) with the name as live text; the full lockup is too wide for a 48px header. --}}
+        <a href="{{ route('home') }}" class="flex min-h-[48px] items-center gap-2.5 rounded-xl" aria-label="{{ config('madeeasy.contact.business_name') }}, home">
+            <img src="{{ asset('images/logo-mark.png') }}" alt="" width="472" height="320" class="h-12 w-auto shrink-0" aria-hidden="true">
             <span class="leading-tight">
                 <span class="block font-display text-base font-bold text-ink">Made Easy</span>
                 <span class="block text-xs text-ink/60">Educational Consultancy</span>

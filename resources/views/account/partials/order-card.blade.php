@@ -18,7 +18,7 @@
         <form method="POST" action="{{ route('orders.pay', $order) }}" class="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 px-5 py-3">
             @csrf
             <span class="text-sm text-ink/70">Amount due: <strong class="text-ink">{{ \App\Support\Money::format($order->total_amount) }}</strong></span>
-            <button type="submit" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-ink bg-accent px-5 text-sm font-semibold text-ink shadow-pop-sm hover:bg-accent-600">
+            <button type="submit" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-ink bg-accent px-5 text-sm font-semibold text-white shadow-pop-sm hover:bg-accent-600">
                 Pay now
             </button>
         </form>

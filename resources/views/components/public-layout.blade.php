@@ -25,6 +25,8 @@
 @php($page_title = filled($metaTitle) ? $metaTitle : ($title ? $title.' | ' : '').config('madeeasy.contact.business_name'))
 @php($page_description = filled($description) ? $description : 'Reliable educational and documentation services: WAEC and NECO registration, admission guidance, result checking, certificate processing and JAMB services.')
 @php($page_url = $canonicalUrl ?? url()->current())
+{{-- Pages without their own share image (e.g. a post's featured image) get the logo banner. --}}
+@php($share_image = filled($ogImage) ? $ogImage : asset('images/og-default.png'))
 @php($whatsapp_url = \App\Support\WhatsApp::link($whatsappMessage))
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -32,6 +34,14 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="theme-color" content="#001848">
+
+        {{-- Favicon set generated from the logo emblem (public/images/logo-mark.png). --}}
+        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16x16.png') }}">
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+        <link rel="manifest" href="{{ asset('site.webmanifest') }}">
 
         {{-- metaTitle (e.g. a post's SEO title) is used exactly as written; otherwise "Title | Business". --}}
         <title>{{ $page_title }}</title>
@@ -46,12 +56,9 @@
             <meta property="og:title" content="{{ $page_title }}">
             <meta property="og:description" content="{{ $page_description }}">
             <meta property="og:locale" content="en_NG">
-            @if ($ogImage)
-                <meta property="og:image" content="{{ $ogImage }}">
-                <meta name="twitter:card" content="summary_large_image">
-            @else
-                <meta name="twitter:card" content="summary">
-            @endif
+            <meta property="og:image" content="{{ $share_image }}">
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:image" content="{{ $share_image }}">
         @endif
 
         {{-- Structured data (JSON-LD) from pages, e.g. the FAQ. --}}

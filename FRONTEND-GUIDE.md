@@ -51,42 +51,45 @@ the text comes from the back office, `.env` or the database (section 3).
 | Part | File | Notes |
 | --- | --- | --- |
 | Whole-page wrapper: `<head>`, page title, SEO / Open Graph tags, skip link, body background | `resources/views/components/public-layout.blade.php` | Every public page starts with `<x-public-layout title="…" description="…">`. The default meta description is here. |
-| **Header**: logo, desktop menu, dropdown, account buttons, mobile menu | `resources/views/partials/public/header.blade.php` | The "ME" logo badge and the "Made Easy / Educational Consultancy" wording are at the top of this file. |
+| **Header**: logo, desktop menu, dropdown, account buttons, mobile menu | `resources/views/partials/public/header.blade.php` | The logo emblem (`public/images/logo-mark.png`) and the "Made Easy / Educational Consultancy" wording are at the top of this file. The full logo, favicons and the default share image (`public/images/og-default.png`) are all generated from the master logo. |
 | **Main menu items** (labels, order, links, Admission dropdown) | `app/Support/PublicNavigation.php` → `items()` | **Edit the menu here, not in the header.** The header, the mobile menu and the footer's "Explore" list all read this one list. |
 | Account buttons (Back office / My Requests / My account / Log out / Track request / Log in) | `header.blade.php`, the `@auth … @else … @endauth` block | Mobile copies are near the bottom of the same file. "My account" opens `/profile`. "Log out" is a small form that posts to `/logout` (`app/Http/Controllers/Auth/LogoutController.php`). |
 | Mobile menu ("Menu" button) | `header.blade.php`, the `<details>` block | Works without JavaScript. Shows below the `xl` screen width (1280px). |
 | **Footer** | `resources/views/partials/public/footer.blade.php` | The tagline "Making your educational journey easier." and the extra links (Track, Maths, FAQ, Testimonials) are here. |
 | **Floating WhatsApp button** | `public-layout.blade.php` (bottom) | The number is `CONTACT_WHATSAPP` in `.env`; the link is built in `app/Support/WhatsApp.php`. Pages can pass a pre-filled message via `whatsapp-message="…"`. |
 | Colours and fonts (the design tokens) | `tailwind.config.js` | See [Design system](#design-system) below. |
-| Buttons on public pages | `resources/views/components/public/button.blade.php` | Variants: `primary` (orange), `dark` (ink), `secondary` (white, outlined). Used as `<x-public.button :href="…" variant="dark">`. |
+| Buttons on public pages | `resources/views/components/public/button.blade.php` | Variants: `primary` (brand blue), `dark` (ink), `secondary` (white, outlined). Used as `<x-public.button :href="…" variant="dark">`. |
 | Hand-written CSS: heading font, focus outline, reduced motion, the carousel, blog post body (`.post-body`) | `resources/css/app.css` | Everything else is Tailwind classes in the templates. |
 
 ### Design system
 
-A **working design direction** to show the client, not the final brand: Made
-Easy's own logo and colours are still pending. To change it, edit
-`tailwind.config.js`, then rebuild.
+The palette is sampled from the Made Easy logo (`public/images/logo.png`). To
+change it, edit `tailwind.config.js` (regenerate the whole 50–950 scale, not
+just the 500 step), then rebuild.
 
 | Token | Value | Use it for |
 | --- | --- | --- |
-| `ink` | `#151313` | Text, borders, dark buttons. Use opacity for softer text: `text-ink/70`. |
-| `accent` (orange scale, `accent` = `accent-500`) | `#ff5734` | **The one dominant colour: primary actions.** Orange backgrounds always take `text-ink` (white on orange fails contrast). For orange *text* on white, use `text-accent-700` or darker. |
-| `secondary` (purple) | `#be94f5` | Sparingly. Used once on the homepage (the Maths tutorials panel). |
-| `highlight` (yellow) | `#fccc42` | Sparingly. The hero illustration's backdrop and the "Not sure where to start?" box. |
+| `ink` | `#001848` (deep navy) | Text, borders, dark buttons, the footer. Use opacity for softer text: `text-ink/70`. |
+| `accent` (blue scale, `accent` = `accent-500`) | `#0048c8` | **The one dominant colour: primary actions.** Blue backgrounds take `text-white` (7.6:1; ink on blue fails at 2.3:1). Blue *text* on white passes as `text-accent` or darker. On the dark footer use `text-accent-300`. |
+| `secondary` (green scale, from the logo's tick) | `#68b000` | Sparingly. Used once on the homepage (the Maths tutorials panel). Takes `text-ink`, never white. |
+| `highlight` (gold scale, from the logo's diploma ribbon) | `#e8a000` | Sparingly. The hero illustration's backdrop and the "Not sure where to start?" box. Takes `text-ink`, never white. |
 | `surface` | `#f7f7f5` | The page background. |
-| `brand-*` | same orange scale as `accent` | Older templates (order page, result checker, Updates, …) use `brand-*`. It's kept as an alias so the whole site matches. When Made Easy's real colour arrives, changing `orange_scale` changes both. |
+| `brand-*` | same blue scale as `accent` | Older templates (order page, result checker, Updates, …) use `brand-*`. It's kept as an alias so the whole site matches; changing `blue_scale` changes both. |
 | `shadow-pop` / `shadow-pop-sm` | hard 4px / 2px ink shadow | Clickable cards and primary buttons only. |
 | `font-display` | Kodchasan, self-hosted in `resources/fonts/kodchasan/` | Headings. `h1`–`h3` get it automatically from `app.css`. **Never use it for prices**: its ₦ looks like ₳. |
 | `font-sans` | Figtree, then the system font | Body text. Public pages don't load the Figtree file, so they show the system font (Segoe UI, Roboto, …). |
 | `animate-rise-in` | 500ms fade and slide up | The homepage hero only. Always write it as `motion-safe:animate-rise-in`. |
 
 **Illustrations** are free [unDraw](https://undraw.co) SVGs, recoloured to the
-palette (purple → orange, dark → ink, and a darker skin tone), in
+palette (purple → accent blue, dark → ink, and a darker skin tone), in
 `resources/images/illustrations/`. They're shown with
-`<x-public.illustration name="hero-requests" />`. To add one:
+`<x-public.illustration name="hero-requests" />`. They are plain SVG files
+loaded as `<img>`, so they can't use Tailwind tokens: the token *values* are
+written into them, and they must be recoloured again if the palette changes.
+To add one:
 
 1. Download the SVG from unDraw.
-2. Replace `#6c63ff` with `#ff5734`.
+2. Replace `#6c63ff` with `#0048c8` (accent) and any near-black with `#001848` (ink).
 3. Save it in that folder.
 4. Add its width and height to the list in `components/public/illustration.blade.php`.
 
@@ -158,7 +161,7 @@ Controllers are in `app/Http/Controllers/`. All URLs are listed in
 
 | Section | What to edit | Shows when |
 | --- | --- | --- |
-| **Hero**: topic tags ("Exam registration", …), headline "Making Your Educational Journey Easier", intro paragraph, 4 buttons, illustration on a yellow panel | the first `<section>` in the file. Button targets are the `:href` values. The headline, paragraph and button labels are the client's wording from the requirements PDF, and `PublicPagesTest` checks them. | always |
+| **Hero**: topic tags ("Exam registration", …), headline "Making Your Educational Journey Easier", intro paragraph, 4 buttons, illustration on a gold panel | the first `<section>` in the file. Button targets are the `:href` values. The headline, paragraph and button labels are the client's wording from the requirements PDF, and `PublicPagesTest` checks them. | always |
 | **Stat badges** in the hero | "Students assisted" number and label: Site settings. "Services available online" and "service categories" are counted from the live categories (`$categories`). | each stat only when it has a real number |
 | **How it works** (3 numbered steps) | the `@foreach ([...])` list of `title` / `body` | always |
 | **Our services**: swipeable category cards (icon, name, description, service count) | cards come from the database (categories with an active service). The row is CSS scroll snap (`.carousel` in `app.css`), with no JavaScript. Icons: `components/public/category-icon.blade.php`. | always (a "coming soon" line if there are none) |

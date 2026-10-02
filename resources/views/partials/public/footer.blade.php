@@ -10,8 +10,8 @@
         <div>
             <p class="text-sm font-semibold uppercase tracking-wide text-white/60">Contact</p>
             <ul class="mt-3 space-y-2 text-sm">
-                <li><a href="tel:{{ preg_replace('/[^0-9+]/', '', $contact['phone']) }}" class="font-medium text-accent hover:underline">{{ $contact['phone'] }}</a></li>
-                <li><a href="mailto:{{ $contact['email'] }}" class="font-medium text-accent hover:underline">{{ $contact['email'] }}</a></li>
+                <li><a href="tel:{{ preg_replace('/[^0-9+]/', '', $contact['phone']) }}" class="font-medium text-accent-300 hover:underline">{{ $contact['phone'] }}</a></li>
+                <li><a href="mailto:{{ $contact['email'] }}" class="font-medium text-accent-300 hover:underline">{{ $contact['email'] }}</a></li>
                 <li class="text-white/70">{{ $contact['address'] }}</li>
             </ul>
         </div>
@@ -20,12 +20,12 @@
             <p class="text-sm font-semibold uppercase tracking-wide text-white/60">Explore</p>
             <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 @foreach (\App\Support\PublicNavigation::items(request()) as $item)
-                    <li><a href="{{ $item['url'] }}" class="text-white/85 hover:text-accent hover:underline">{{ $item['label'] }}</a></li>
+                    <li><a href="{{ $item['url'] }}" class="text-white/85 hover:text-accent-300 hover:underline">{{ $item['label'] }}</a></li>
                 @endforeach
-                <li><a href="{{ route('orders.track') }}" class="text-white/85 hover:text-accent hover:underline">Track your request</a></li>
-                <li><a href="{{ route('maths-tutoring') }}" class="text-white/85 hover:text-accent hover:underline">Maths tutorials</a></li>
-                <li><a href="{{ route('faq') }}" class="text-white/85 hover:text-accent hover:underline">FAQ</a></li>
-                <li><a href="{{ route('testimonials') }}" class="text-white/85 hover:text-accent hover:underline">Testimonials</a></li>
+                <li><a href="{{ route('orders.track') }}" class="text-white/85 hover:text-accent-300 hover:underline">Track your request</a></li>
+                <li><a href="{{ route('maths-tutoring') }}" class="text-white/85 hover:text-accent-300 hover:underline">Maths tutorials</a></li>
+                <li><a href="{{ route('faq') }}" class="text-white/85 hover:text-accent-300 hover:underline">FAQ</a></li>
+                <li><a href="{{ route('testimonials') }}" class="text-white/85 hover:text-accent-300 hover:underline">Testimonials</a></li>
             </ul>
         </div>
     </div>
